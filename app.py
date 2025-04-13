@@ -347,151 +347,148 @@ def get_search_volumes(brands, settings, client):
     if not client:
         st.error("Google Ads client not initialized. Please check your credentials.")
         return []
-    
-    results = []
-    
-    # Parse date range from settings
-    start_date = datetime.strptime(settings["dateFrom"], "%Y-%m-%d")
-    end_date = datetime.strptime(settings["dateTo"], "%Y-%m-%d")
-    
-    # Generate time periods based on granularity
-    periods = []
-    current_date = start_date
-    
-    if settings["granularity"] == "monthly":
-        while current_date <= end_date:
-            periods.append((current_date.year, current_date.month, current_date.strftime("%Y-%m")))
-            # Add one month
-            month = current_date.month + 1
-            year = current_date.year
-            if month > 12:
-                month = 1
-                year += 1
-            current_date = current_date.replace(year=year, month=month, day=1)
-    elif settings["granularity"] == "quarterly":
-        while current_date <= end_date:
-            quarter = (current_date.month - 1) // 3 + 1
-            periods.append((current_date.year, quarter, f"{current_date.year}-Q{quarter}"))
-            # Add one quarter (3 months)
-            month = current_date.month + 3
-            year = current_date.year
-            if month > 12:
-                month = month - 12
-                year += 1
-            current_date = current_date.replace(year=year, month=month, day=1)
-    else:  # yearly
-        while current_date.year <= end_date.year:
-            periods.append((current_date.year, None, str(current_date.year)))
-            current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
-    
+
+    # Store aggregated data: key=(brand_name, period_label), value=volume
+    aggregated_data = {}
+    # Store brand colors: key=brand_name, value=color
+    brand_colors = {brand["name"]: brand["color"] for brand in brands if brand["name"]}
+
+    # Parse date range from settings (ensure start is day 1, end is end of month for comparison)
+    start_date = datetime.strptime(settings["dateFrom"], "%Y-%m-%d").replace(day=1)
+    temp_end_date = datetime.strptime(settings["dateTo"], "%Y-%m-%d")
+    # Find the first day of the next month, then subtract one day to get the end of the current month
+    next_month = temp_end_date.replace(day=28) + timedelta(days=4) # Go near the end of the month, then jump to next
+    end_date = next_month - timedelta(days=next_month.day) # Calculate last day of the selected end month
+
     # Get location and language IDs
     location_id = COUNTRY_MAPPING.get(settings["location"], "2840")  # Default to US if not found
     language_id = LANGUAGE_MAPPING.get(settings["language"], "1000")  # Default to English if not found
-    
+
     # Get customer ID from secrets
     customer_id = st.secrets["GOOGLE_CUSTOMER_ID"]
-    
+
     # Process each brand and its keywords
     for brand in brands:
         if not brand["name"] or not any(k.strip() for k in brand["keywords"]):
             continue
-        
+
+        brand_name = brand["name"]
         brand_keywords = [k.strip() for k in brand["keywords"] if k.strip()]
-        
+
         try:
             # Create keyword plan idea service
             keyword_plan_idea_service = client.get_service("KeywordPlanIdeaService")
             googleads_service = client.get_service("GoogleAdsService")
-            
+
             # Create request for historical metrics
             request = client.get_type("GenerateKeywordHistoricalMetricsRequest")
             request.customer_id = customer_id
             request.keywords.extend(brand_keywords)
-            
+
             # Add geo target constants if not "All Countries"
             if settings["location"] != "All Countries":
                 request.geo_target_constants.append(googleads_service.geo_target_constant_path(location_id))
-            
+
             # Set language if not "All Languages"
             if settings["language"] != "All Languages":
                 request.language = googleads_service.language_constant_path(language_id)
-            
+
             # Set network based on settings
-            if settings["network"] == "GOOGLE_SEARCH":
-                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
-            else:  # GOOGLE_SEARCH_AND_PARTNERS
-                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
-            
+            if settings["network"] == "Google Search":
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.Google Search
+            else:  # Google Search_AND_PARTNERS
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.Google Search_AND_PARTNERS
+
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_historical_metrics(request=request)
-            
-            # Process the response for each period
-            for period_year, period_month_or_quarter, period_label in periods:
-                brand_volume = 0
-                
-                # Process each result
-                for result in response.results:
-                    keyword_metrics = result.keyword_metrics
-                    
-                    # For monthly granularity, find the specific month's data
-                    if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
-                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                            if (monthly_search_volume.year == period_year and 
-                                monthly_search_volume.month.value == period_month_or_quarter):
-                                brand_volume += monthly_search_volume.monthly_searches
-                                break
-                    
-                    # For quarterly granularity, sum the months in the quarter
-                    elif settings["granularity"] == "quarterly" and period_month_or_quarter is not None:
-                        quarter_start_month = (period_month_or_quarter - 1) * 3 + 1
-                        quarter_end_month = quarter_start_month + 2
-                        
-                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                            if (monthly_search_volume.year == period_year and 
-                                quarter_start_month <= monthly_search_volume.month.value <= quarter_end_month):
-                                brand_volume += monthly_search_volume.monthly_searches
-                    
-                    # For yearly granularity, sum all months in the year
-                    elif settings["granularity"] == "yearly":
-                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                            if monthly_search_volume.year == period_year:
-                                brand_volume += monthly_search_volume.monthly_searches
-                
-                # Add brand data to results if there's volume
-                if brand_volume > 0:
-                    results.append({
-                        "brand": brand["name"],
-                        "period": period_label,
-                        "volume": brand_volume,
-                        "share": 0,  # Will calculate after all volumes are collected
-                        "color": brand["color"]
-                    })
-        
+
+            # Process the response results
+            for result in response.results:
+                keyword_metrics = result.keyword_metrics
+                if not keyword_metrics:
+                    continue
+
+                # Iterate through all monthly search volumes returned by the API
+                for msv in keyword_metrics.monthly_search_volumes:
+                    # Check if the month/year from API is valid
+                    if not msv.year or not msv.month:
+                        continue
+
+                    msv_year = msv.year
+                    # Ensure msv.month.value gives the integer month (1-12)
+                    msv_month = msv.month.value if hasattr(msv.month, 'value') else msv.month
+                    if not 1 <= msv_month <= 12:
+                         continue # Skip invalid month value
+
+                    msv_date = datetime(msv_year, msv_month, 1)
+
+                    # Check if this month's data falls within the selected date range
+                    if start_date <= msv_date <= end_date:
+                        period_label = ""
+                        # Determine the period label based on granularity
+                        if settings["granularity"] == "monthly":
+                            period_label = f"{msv_year}-{msv_month:02d}"
+                        elif settings["granularity"] == "quarterly":
+                            quarter = (msv_month - 1) // 3 + 1
+                            period_label = f"{msv_year}-Q{quarter}"
+                        elif settings["granularity"] == "yearly":
+                            period_label = f"{msv_year}"
+
+                        if period_label:
+                            # Aggregate volume
+                            data_key = (brand_name, period_label)
+                            aggregated_data[data_key] = aggregated_data.get(data_key, 0) + (msv.monthly_searches or 0)
+
         except GoogleAdsException as ex:
             st.error(f"Google Ads API error for brand {brand['name']}: {ex}")
-            for error in ex.failure.errors:
-                st.error(f"Error details: {error.message}")
-            continue
-        
+            # Log specific errors if needed
+            # for error in ex.failure.errors:
+            #     st.error(f"Error details: {error.message}")
+            continue # Continue with the next brand
+
         except Exception as e:
             st.error(f"Error retrieving search volume for {brand['name']}: {str(e)}")
-            continue
-    
-    # Calculate total volume and share percentages for each period
-    period_totals = {}
-    for result in results:
-        period = result["period"]
-        if period not in period_totals:
-            period_totals[period] = 0
-        period_totals[period] += result["volume"]
-    
-    # Calculate share percentages
-    for result in results:
-        period = result["period"]
-        if period_totals[period] > 0:
-            result["share"] = round((result["volume"] / period_totals[period]) * 100, 1)
-    
-    return results
+            continue # Continue with the next brand
+
+    # Format the aggregated data into the final results list
+    formatted_results = []
+    period_totals = {} # To calculate shares: key=period_label, value=total_volume
+
+    # Calculate period totals first
+    for (brand_name, period_label), volume in aggregated_data.items():
+        period_totals[period_label] = period_totals.get(period_label, 0) + volume
+
+    # Now create the final list with shares
+    for (brand_name, period_label), volume in aggregated_data.items():
+        total_volume = period_totals.get(period_label, 0)
+        share = round((volume / total_volume) * 100, 1) if total_volume > 0 else 0
+        formatted_results.append({
+            "brand": brand_name,
+            "period": period_label,
+            "volume": volume,
+            "share": share,
+            "color": brand_colors.get(brand_name, "#808080") # Default color if needed
+        })
+
+    # Sort results by period for consistent chart display
+    def sort_key(item):
+        period = item['period']
+        try:
+            if 'Q' in period: # Quarterly: YYYY-Q#
+                year, q = period.split('-Q')
+                # Sort by year, then quarter (represented as month 1, 4, 7, 10)
+                return datetime(int(year), (int(q)-1)*3 + 1, 1)
+            elif '-' in period: # Monthly: YYYY-MM
+                return datetime.strptime(period, '%Y-%m')
+            else: # Yearly: YYYY
+                return datetime(int(period), 1, 1)
+        except ValueError:
+            # Fallback for unexpected formats
+            return datetime.min
+
+    formatted_results.sort(key=sort_key)
+
+    return formatted_results
 
 # App title and introduction
 st.title("🔍 Share of Brand Search Tool")
