@@ -395,9 +395,9 @@ def get_search_volumes(brands, settings, client):
 
             # Set network based on settings
             if settings["network"] == "Google Search":
-                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.Google Search
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.Google_Search
             else:  # Google Search_AND_PARTNERS
-                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.Google Search_AND_PARTNERS
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.Google_Search_AND_PARTNERS
 
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_historical_metrics(request=request)
