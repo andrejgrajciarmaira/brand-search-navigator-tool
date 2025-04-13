@@ -1,73 +1,119 @@
-# Welcome to your Lovable project
 
-## Project info
+# Share of Brand Search Tool
 
-**URL**: https://lovable.dev/projects/093a3c5c-82ce-4651-b022-35f4dcb6233c
+A web application that allows you to analyze brand search volumes from Google Ads Keyword Planner. Compare your brand's search performance against competitors and visualize market share trends over time.
 
-## How can I edit this code?
+## Features
 
-There are several ways of editing your application.
+- Input and manage multiple brands and their related keywords
+- Separate your own brands from competitor brands
+- Select location, language, and network settings
+- Choose custom date ranges for analysis
+- View data at monthly, quarterly, or yearly granularity
+- Visualize results as:
+  - Share of search percentage charts
+  - Absolute search volume charts
+  - Raw data tables
+- Export charts and data for reporting
 
-**Use Lovable**
+## Prerequisites
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/093a3c5c-82ce-4651-b022-35f4dcb6233c) and start prompting.
+Before running this application, you'll need:
 
-Changes made via Lovable will be committed automatically to this repo.
+1. **Node.js**: Version 14 or higher
+2. **Google Ads Account**: With admin access
+3. **Google Cloud Platform Account**: For API credentials
+4. **Google Ads API Setup**: Developer token and OAuth credentials
 
-**Use your preferred IDE**
+## Running the Application Locally
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### 1. Clone the repository
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+```bash
+git clone https://github.com/yourusername/share-of-search-tool.git
+cd share-of-search-tool
+```
 
-Follow these steps:
+### 2. Install dependencies
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+```bash
+npm install
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### 3. Configure Environment Variables
 
-# Step 3: Install the necessary dependencies.
-npm i
+Create a `.env` file in the root directory with the following variables:
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+```
+# Google Ads API credentials
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+GOOGLE_DEVELOPER_TOKEN=your-developer-token
+GOOGLE_REFRESH_TOKEN=your-refresh-token
+```
+
+### 4. Start the development server
+
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+Visit `http://localhost:8080` in your browser to use the application.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Google Ads API Setup Guide
 
-**Use GitHub Codespaces**
+To use this application with real data from Google Ads, you'll need to set up the Google Ads API. Follow these detailed steps:
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+### Step 1: Create a Google Cloud Project
 
-## What technologies are used for this project?
+1. Go to the [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select an existing one
+3. Enable the Google Ads API for your project:
+   - Navigate to "APIs & Services" > "Library"
+   - Search for "Google Ads API"
+   - Click "Enable"
 
-This project is built with:
+### Step 2: Set up OAuth 2.0 Credentials
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+1. In the Google Cloud Console, go to "APIs & Services" > "Credentials"
+2. Click "Create Credentials" and select "OAuth client ID"
+3. Select "Web application" as the application type
+4. Add a name for your OAuth client
+5. Add `http://localhost:8080/callback` as an authorized redirect URI
+6. Click "Create" to generate your Client ID and Client Secret
 
-## How can I deploy this project?
+### Step 3: Obtain a Developer Token
 
-Simply open [Lovable](https://lovable.dev/projects/093a3c5c-82ce-4651-b022-35f4dcb6233c) and click on Share -> Publish.
+1. Log in to your Google Ads account at [ads.google.com](https://ads.google.com)
+2. Click the tools icon in the upper right corner
+3. Under "Setup," select "API Center"
+4. Apply for a developer token by providing the required information
 
-## Can I connect a custom domain to my Lovable project?
+> Note: For testing purposes, you can use a test account which provides immediate access with limited functionality.
 
-Yes, you can!
+### Step 4: Generate a Refresh Token
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+1. Run the authentication script:
+   ```bash
+   npm run auth
+   ```
+2. Follow the prompts to authorize the application
+3. The refresh token will be saved in your `.env` file
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/tips-tricks/custom-domain#step-by-step-guide)
+## Data Integration
+
+This application uses the Google Ads API to fetch keyword search volume data. The integration:
+
+1. Connects to the Google Ads API using your credentials
+2. Retrieves historical search volume data for specified keywords
+3. Groups the data by brand based on your configuration
+4. Calculates share percentages for each time period
+5. Generates visualizations based on the aggregated data
+
+## License
+
+[MIT License](LICENSE)
+
+## Contact
+
+For questions or support, please contact [your-email@example.com](mailto:your-email@example.com)
