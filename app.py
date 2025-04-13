@@ -362,7 +362,7 @@ def get_search_volumes(brands, settings, client):
         while current_date <= end_date:
             periods.append((current_date.year, current_date.month, current_date.strftime("%Y-%m")))
             # Add one month
-            month = current_date.month - 1
+            month = current_date.month + 1
             year = current_date.year
             if month > 12:
                 month = 1
