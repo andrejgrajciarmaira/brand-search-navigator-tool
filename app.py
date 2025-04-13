@@ -514,12 +514,6 @@ def get_search_volumes(brands, settings, client):
     
     return results
 
-# Function to convert Plotly figure to image
-def plotly_fig_to_image(fig):
-    """Convert a Plotly figure to a PNG image."""
-    img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
-    return img_bytes
-
 # App title and introduction
 st.title("🔍 Share of Brand Search Tool")
 st.markdown("""
@@ -835,14 +829,17 @@ if st.session_state["show_results"] and len(tabs) > 1:
             )
         
         with col2:
-            # Export as PNG (only available if a figure is displayed)
+            # Export as HTML (instead of PNG)
             if st.session_state["current_fig"] is not None:
-                img_bytes = plotly_fig_to_image(st.session_state["current_fig"])
+                # Convert the figure to HTML
+                html_str = st.session_state["current_fig"].to_html(include_plotlyjs="cdn")
+                
+                # Create a download button for the HTML file
                 st.download_button(
-                    label="📊 Download Chart as PNG",
-                    data=img_bytes,
-                    file_name=f"share_of_search_chart_{datetime.now().strftime('%Y%m%d')}.png",
-                    mime="image/png"
+                    label="📊 Download Interactive Chart (HTML)",
+                    data=html_str,
+                    file_name=f"share_of_search_chart_{datetime.now().strftime('%Y%m%d')}.html",
+                    mime="text/html"
                 )
             else:
                 st.info("Chart export is available when viewing Share of Search or Search Volume visualizations.")
