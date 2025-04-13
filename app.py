@@ -365,10 +365,8 @@ def get_search_volumes(brands, settings, client):
             
             # For API matching, we need to adjust for the month offset
             # Google Ads API reports data for the previous month
-            # Create a copy of current_date for API querying
-            api_date = current_date - timedelta(days=28)  # Subtract approximately one month
-            api_month = api_date.month
-            api_year = api_date.year
+            api_month = current_date.month
+            api_year = current_date.year
             
             periods.append((api_year, api_month, display_label))
             
@@ -386,10 +384,8 @@ def get_search_volumes(brands, settings, client):
             
             # For quarterly data, we still need to adjust for the month offset
             # but we're working with quarters
-            # Create a copy of current_date for API querying
-            api_date = current_date - timedelta(days=28)  # Subtract approximately one month
-            api_quarter = ((api_date.month - 1) // 3) + 1
-            api_year = api_date.year
+            api_quarter = quarter
+            api_year = current_date.year
             
             periods.append((api_year, api_quarter, display_label))
             
@@ -403,11 +399,7 @@ def get_search_volumes(brands, settings, client):
     else:  # yearly
         while current_date.year <= end_date.year:
             display_label = str(current_date.year)
-            
-            # For yearly data, we still need to adjust for the month offset
-            # Create a copy of current_date for API querying
-            api_date = current_date - timedelta(days=28)  # Subtract approximately one month
-            api_year = api_date.year
+            api_year = current_date.year
             
             periods.append((api_year, None, display_label))
             current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
@@ -491,255 +483,374 @@ def get_search_volumes(brands, settings, client):
                     results.append({
                         "brand": brand["name"],
                         "period": period_label,
-                        "search_volume": brand_volume
+                        "volume": brand_volume,
+                        "share": 0,  # Will calculate after all volumes are collected
+                        "color": brand["color"]
                     })
         
         except GoogleAdsException as ex:
-            st.error(f"Google Ads API error: {ex}")
+            st.error(f"Google Ads API error for brand {brand['name']}: {ex}")
             for error in ex.failure.errors:
                 st.error(f"Error details: {error.message}")
-            return []
+            continue
+        
+        except Exception as e:
+            st.error(f"Error retrieving search volume for {brand['name']}: {str(e)}")
+            continue
     
-    # Calculate market share for each period
-    periods_data = {}
+    # Calculate total volume and share percentages for each period
+    period_totals = {}
     for result in results:
         period = result["period"]
-        if period not in periods_data:
-            periods_data[period] = {"total": 0, "brands": {}}
-        
-        brand = result["brand"]
-        volume = result["search_volume"]
-        
-        periods_data[period]["brands"][brand] = volume
-        periods_data[period]["total"] += volume
+        if period not in period_totals:
+            period_totals[period] = 0
+        period_totals[period] += result["volume"]
     
-    # Create final results with market share
-    final_results = []
+    # Calculate share percentages
     for result in results:
         period = result["period"]
-        brand = result["brand"]
-        volume = result["search_volume"]
-        
-        total_volume = periods_data[period]["total"]
-        market_share = (volume / total_volume * 100) if total_volume > 0 else 0
-        
-        final_results.append({
-            "period": period,
-            "brand": brand,
-            "search_volume": volume,
-            "market_share": market_share
-        })
+        if period_totals[period] > 0:
+            result["share"] = round((result["volume"] / period_totals[period]) * 100, 1)
     
-    return final_results
+    return results
 
-# Function to generate a download link for a dataframe
-def get_csv_download_link(df, filename="data.csv"):
-    csv = df.to_csv(index=False)
-    b64 = base64.b64encode(csv.encode()).decode()
-    href = f'data:file/csv;base64,{b64}'
-    return href
+# Function to convert Plotly figure to image
+def plotly_fig_to_image(fig):
+    """Convert a Plotly figure to a PNG image."""
+    img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
+    return img_bytes
 
-# Function to generate a download link for Excel
-def get_excel_download_link(df, filename="data.xlsx"):
-    buffer = BytesIO()
-    with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-        df.to_excel(writer, index=False, sheet_name="Data")
-        # Add formatting
-        workbook = writer.book
-        worksheet = writer.sheets["Data"]
-        format_percent = workbook.add_format({"num_format": "0.00%"})
-        format_number = workbook.add_format({"num_format": "#,##0"})
+# App title and introduction
+st.title("🔍 Share of Brand Search Tool")
+st.markdown("""
+This tool helps you analyze brand search volumes from Google Ads and visualize market share trends over time.
+Compare your brands against competitors to gain insights into search performance.
+""")
+
+# Initialize Google Ads client
+google_ads_client = get_google_ads_client()
+
+# Initialize session state variables
+if "brands" not in st.session_state:
+    st.session_state["brands"] = [
+        {"id": str(uuid.uuid4()), "name": "", "keywords": [""], "isOwnBrand": True, "color": "#1f77b4"},
+        {"id": str(uuid.uuid4()), "name": "", "keywords": [""], "isOwnBrand": False, "color": "#ff7f0e"}
+    ]
+
+if "settings" not in st.session_state:
+    st.session_state["settings"] = {
+        "location": "United States",
+        "language": "English",
+        "network": "GOOGLE_SEARCH",
+        "dateFrom": (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),  # Last year
+        "dateTo": datetime.now().strftime("%Y-%m-%d"),
+        "granularity": "monthly"
+    }
+
+if "results" not in st.session_state:
+    st.session_state["results"] = []
+
+if "show_results" not in st.session_state:
+    st.session_state["show_results"] = False
+
+if "current_fig" not in st.session_state:
+    st.session_state["current_fig"] = None
+
+# Main application interface
+tabs = st.tabs(["Input Parameters", "Results"] if st.session_state["show_results"] else ["Input Parameters"])
+
+with tabs[0]:
+    st.header("Brand Configuration")
+    
+    # Create two columns
+    col1, col2 = st.columns([1, 1])
+    
+    with col1:
+        st.subheader("Your Brands")
         
-        # Apply formatting to columns
-        worksheet.set_column("A:A", 12)  # Period
-        worksheet.set_column("B:B", 20)  # Brand
-        worksheet.set_column("C:C", 15, format_number)  # Search Volume
-        worksheet.set_column("D:D", 15, format_percent)  # Market Share
+        # Function to add a new brand
+        def add_brand(is_own_brand):
+            colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd", 
+                      "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"]
+            
+            brand_count = len([b for b in st.session_state["brands"] if b["isOwnBrand"] == is_own_brand])
+            st.session_state["brands"].append({
+                "id": str(uuid.uuid4()),
+                "name": "",
+                "keywords": [""],
+                "isOwnBrand": is_own_brand,
+                "color": colors[brand_count % len(colors)]
+            })
+        
+        # Display own brands
+        own_brands = [b for b in st.session_state["brands"] if b["isOwnBrand"]]
+        if not own_brands:
+            st.info("Add your own brands to track")
+        
+        for i, brand in enumerate(own_brands):
+            with st.expander(f"Brand {i+1}: {brand['name'] or 'Unnamed'}", expanded=brand["name"] == ""):
+                # Brand name
+                new_name = st.text_input("Brand Name", brand["name"], key=f"own_name_{brand['id']}")
+                if new_name != brand["name"]:
+                    brand["name"] = new_name
+                
+                # Brand color
+                new_color = st.color_picker("Brand Color", brand["color"], key=f"own_color_{brand['id']}")
+                if new_color != brand["color"]:
+                    brand["color"] = new_color
+                
+                # Keywords
+                st.write("Keywords (one per line):")
+                keywords_text = "\n".join(brand["keywords"])
+                new_keywords = st.text_area("", keywords_text, key=f"own_keywords_{brand['id']}")
+                if new_keywords != keywords_text:
+                    brand["keywords"] = [k.strip() for k in new_keywords.split("\n") if k.strip()]
+                    if not brand["keywords"]:
+                        brand["keywords"] = [""]
+                
+                # Remove brand button
+                if st.button("Remove Brand", key=f"remove_own_{brand['id']}"):
+                    st.session_state["brands"] = [b for b in st.session_state["brands"] if b["id"] != brand["id"]]
+                    st.rerun()
+        
+        if st.button("➕ Add Your Brand"):
+            add_brand(True)
+            st.rerun()
+        
+        st.subheader("Competitor Brands")
+        
+        competitor_brands = [b for b in st.session_state["brands"] if not b["isOwnBrand"]]
+        if not competitor_brands:
+            st.info("Add competitor brands to compare")
+        
+        for i, brand in enumerate(competitor_brands):
+            with st.expander(f"Competitor {i+1}: {brand['name'] or 'Unnamed'}", expanded=brand["name"] == ""):
+                # Brand name
+                new_name = st.text_input("Brand Name", brand["name"], key=f"comp_name_{brand['id']}")
+                if new_name != brand["name"]:
+                    brand["name"] = new_name
+                
+                # Brand color
+                new_color = st.color_picker("Brand Color", brand["color"], key=f"comp_color_{brand['id']}")
+                if new_color != brand["color"]:
+                    brand["color"] = new_color
+                
+                # Keywords
+                st.write("Keywords (one per line):")
+                keywords_text = "\n".join(brand["keywords"])
+                new_keywords = st.text_area("", keywords_text, key=f"comp_keywords_{brand['id']}")
+                if new_keywords != keywords_text:
+                    brand["keywords"] = [k.strip() for k in new_keywords.split("\n") if k.strip()]
+                    if not brand["keywords"]:
+                        brand["keywords"] = [""]
+                
+                # Remove brand button
+                if st.button("Remove Brand", key=f"remove_comp_{brand['id']}"):
+                    st.session_state["brands"] = [b for b in st.session_state["brands"] if b["id"] != brand["id"]]
+                    st.rerun()
+        
+        if st.button("➕ Add Competitor Brand"):
+            add_brand(False)
+            st.rerun()
     
-    buffer.seek(0)
-    b64 = base64.b64encode(buffer.read()).decode()
-    href = f'data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,{b64}'
-    return href
+    with col2:
+        st.subheader("Search Parameters")
+        
+        # Location
+        locations = list(COUNTRY_MAPPING.keys())
+        st.session_state["settings"]["location"] = st.selectbox(
+            "Location", 
+            options=locations,
+            index=locations.index(st.session_state["settings"]["location"]) if st.session_state["settings"]["location"] in locations else locations.index("United States")
+        )
+        
+        # Language
+        languages = list(LANGUAGE_MAPPING.keys())
+        st.session_state["settings"]["language"] = st.selectbox(
+            "Language",
+            options=languages,
+            index=languages.index(st.session_state["settings"]["language"]) if st.session_state["settings"]["language"] in languages else languages.index("English")
+        )
+        
+        # Network - Updated to match the API's available options
+        networks = [
+            ("GOOGLE_SEARCH", "Google Search"),
+            ("GOOGLE_SEARCH_AND_PARTNERS", "Google Search + Search Partners")
+        ]
+        network_options = [n[1] for n in networks]
+        current_network_index = next((i for i, n in enumerate(networks) if n[0] == st.session_state["settings"]["network"]), 0)
+        selected_network = st.selectbox(
+            "Network",
+            options=network_options,
+            index=current_network_index
+        )
+        st.session_state["settings"]["network"] = networks[network_options.index(selected_network)][0]
+        
+        # Date Range
+        col_date1, col_date2 = st.columns(2)
+        
+        with col_date1:
+            start_date = st.date_input(
+                "From Date",
+                value=datetime.strptime(st.session_state["settings"]["dateFrom"], "%Y-%m-%d"),
+                max_value=datetime.now()
+            )
+            st.session_state["settings"]["dateFrom"] = start_date.strftime("%Y-%m-%d")
+        
+        with col_date2:
+            end_date = st.date_input(
+                "To Date",
+                value=datetime.strptime(st.session_state["settings"]["dateTo"], "%Y-%m-%d"),
+                min_value=start_date,
+                max_value=datetime.now()
+            )
+            st.session_state["settings"]["dateTo"] = end_date.strftime("%Y-%m-%d")
+        
+        # Data Granularity
+        st.session_state["settings"]["granularity"] = st.radio(
+            "Data Granularity",
+            options=["monthly", "quarterly", "yearly"],
+            index=["monthly", "quarterly", "yearly"].index(st.session_state["settings"]["granularity"]),
+            horizontal=True
+        )
+        
+        # Generate Results Button
+        st.markdown("### Generate Results")
+        
+        valid_brands = [b for b in st.session_state["brands"] 
+                       if b["name"] and any(k.strip() for k in b["keywords"])]
+        
+        if len(valid_brands) < 1:
+            st.warning("Please add at least one brand with a name and keywords.")
+        else:
+            if st.button("🔍 Generate Search Volume Data", type="primary"):
+                with st.spinner("Fetching search volume data from Google Ads..."):
+                    # Get search volumes using the Google Ads client
+                    results = get_search_volumes(valid_brands, st.session_state["settings"], google_ads_client)
+                    
+                    if results:
+                        st.session_state["results"] = results
+                        st.session_state["show_results"] = True
+                        st.rerun()
+                    else:
+                        st.error("No data found for the selected parameters.")
 
-# Main app layout
-def main():
-    # Add custom CSS
-    st.markdown("""
-    <style>
-    .main-header {
-        font-size: 2.5rem;
-        color: #1E88E5;
-        margin-bottom: 1rem;
-    }
-    .section-header {
-        font-size: 1.5rem;
-        color: #333;
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
-    }
-    .info-text {
-        font-size: 1rem;
-        color: #555;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-    
-    # App header
-    st.markdown('<h1 class="main-header">Brand Search Navigator</h1>', unsafe_allow_html=True)
-    st.markdown('<p class="info-text">Analyze brand search volumes and market share trends over time.</p>', unsafe_allow_html=True)
-    
-    # Initialize session state for brands if not exists
-    if 'brands' not in st.session_state:
-        st.session_state.brands = [{"name": "", "keywords": ""}]
-    
-    # Create tabs
-    tab1, tab2 = st.tabs(["Brand Analysis", "About"])
-    
-    with tab1:
-        # Create columns for the form
-        col1, col2 = st.columns([2, 1])
+# Results tab (only shown after generating results)
+if st.session_state["show_results"] and len(tabs) > 1:
+    with tabs[1]:
+        st.header("Share of Search Results")
+        
+        # Convert results to DataFrame
+        df = pd.DataFrame(st.session_state["results"])
+        
+        # Create visualization options
+        viz_type = st.radio(
+            "Visualization Type",
+            options=["Share of Search (%)", "Search Volume", "Data Table"],
+            horizontal=True
+        )
+        
+        if viz_type == "Share of Search (%)":
+            # Create a stacked area chart for share percentages
+            fig = px.area(
+                df, 
+                x="period", 
+                y="share", 
+                color="brand",
+                color_discrete_map={brand["name"]: brand["color"] for brand in st.session_state["brands"] if brand["name"]},
+                title="Share of Search Over Time (%)",
+                labels={"period": "Time Period", "share": "Share (%)", "brand": "Brand"},
+                groupnorm="percent"
+            )
+            
+            fig.update_layout(
+                xaxis_title="Time Period",
+                yaxis_title="Share of Search (%)",
+                legend_title="Brands",
+                height=600
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Store the current figure in session state for export
+            st.session_state["current_fig"] = fig
+            
+        elif viz_type == "Search Volume":
+            # Create a line chart for absolute search volumes
+            fig = px.line(
+                df, 
+                x="period", 
+                y="volume", 
+                color="brand",
+                color_discrete_map={brand["name"]: brand["color"] for brand in st.session_state["brands"] if brand["name"]},
+                title="Search Volume Over Time",
+                labels={"period": "Time Period", "volume": "Search Volume", "brand": "Brand"},
+                markers=True
+            )
+            
+            fig.update_layout(
+                xaxis_title="Time Period",
+                yaxis_title="Search Volume",
+                legend_title="Brands",
+                height=600
+            )
+            
+            st.plotly_chart(fig, use_container_width=True)
+            
+            # Store the current figure in session state for export
+            st.session_state["current_fig"] = fig
+            
+        else:  # Data Table
+            # Group by period and calculate totals
+            periods = sorted(df["period"].unique())
+            
+            # Create a pivot table
+            pivot_df = df.pivot(index="period", columns="brand", values=["volume", "share"]).reset_index()
+            
+            # Flatten the column names
+            pivot_df.columns = [f"{col[0]}_{col[1]}" if col[1] else col[0] for col in pivot_df.columns]
+            
+            # Sort by period
+            pivot_df = pivot_df.sort_values("period")
+            
+            # Display the table
+            st.dataframe(pivot_df, use_container_width=True)
+            
+            # Clear the current figure in session state since we're showing a table
+            st.session_state["current_fig"] = None
+        
+        # Export options
+        st.subheader("Export Options")
+        
+        col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown('<h2 class="section-header">Brand Configuration</h2>', unsafe_allow_html=True)
-            
-            # Brand inputs
-            for i, brand in enumerate(st.session_state.brands):
-                cols = st.columns([3, 7, 1])
-                with cols[0]:
-                    brand_name = st.text_input(f"Brand {i+1} Name", brand["name"], key=f"brand_name_{i}")
-                with cols[1]:
-                    brand_keywords = st.text_input(f"Brand {i+1} Keywords (comma-separated)", brand["keywords"], key=f"brand_keywords_{i}")
-                with cols[2]:
-                    if i > 0 and st.button("Remove", key=f"remove_{i}"):
-                        st.session_state.brands.pop(i)
-                        st.rerun()
-                
-                # Update session state
-                st.session_state.brands[i]["name"] = brand_name
-                st.session_state.brands[i]["keywords"] = brand_keywords
-            
-            # Add brand button
-            if st.button("Add Brand"):
-                st.session_state.brands.append({"name": "", "keywords": ""})
-                st.rerun()
+            # Export as CSV
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📄 Download CSV",
+                data=csv,
+                file_name=f"share_of_search_data_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
         
         with col2:
-            st.markdown('<h2 class="section-header">Settings</h2>', unsafe_allow_html=True)
-            
-            # Date range
-            date_from = st.date_input("From Date", datetime.now() - timedelta(days=365))
-            date_to = st.date_input("To Date", datetime.now())
-            
-            # Granularity
-            granularity = st.selectbox("Time Granularity", ["monthly", "quarterly", "yearly"])
-            
-            # Language
-            language = st.selectbox("Language", list(LANGUAGE_MAPPING.keys()))
-            
-            # Location
-            location = st.selectbox("Location", list(COUNTRY_MAPPING.keys()))
-            
-            # Network
-            networks = [
-                ("GOOGLE_SEARCH", "Google Search"),
-                ("GOOGLE_SEARCH_AND_PARTNERS", "Google Search + Search Partners")
-            ]
-            network = st.selectbox("Network", [n[0] for n in networks], format_func=lambda x: dict(networks)[x])
-        
-        # Collect settings
-        settings = {
-            "dateFrom": date_from.strftime("%Y-%m-%d"),
-            "dateTo": date_to.strftime("%Y-%m-%d"),
-            "granularity": granularity,
-            "language": language,
-            "location": location,
-            "network": network
-        }
-        
-        # Run analysis button
-        if st.button("Run Analysis"):
-            # Validate inputs
-            valid_brands = [b for b in st.session_state.brands if b["name"] and b["keywords"]]
-            
-            if not valid_brands:
-                st.error("Please add at least one brand with name and keywords.")
+            # Export as PNG (only available if a figure is displayed)
+            if st.session_state["current_fig"] is not None:
+                img_bytes = plotly_fig_to_image(st.session_state["current_fig"])
+                st.download_button(
+                    label="📊 Download Chart as PNG",
+                    data=img_bytes,
+                    file_name=f"share_of_search_chart_{datetime.now().strftime('%Y%m%d')}.png",
+                    mime="image/png"
+                )
             else:
-                # Initialize Google Ads client
-                client = get_google_ads_client()
-                
-                # Get search volumes
-                with st.spinner("Fetching data from Google Ads API..."):
-                    results = get_search_volumes(valid_brands, settings, client)
-                
-                if results:
-                    # Convert to dataframe
-                    df = pd.DataFrame(results)
-                    
-                    # Store in session state
-                    st.session_state.results_df = df
-                    
-                    # Display results
-                    st.success("Analysis complete!")
-                    
-                    # Create tabs for different visualizations
-                    viz_tab1, viz_tab2, viz_tab3 = st.tabs(["Share of Search", "Search Volume", "Data Table"])
-                    
-                    with viz_tab1:
-                        # Create market share chart
-                        fig = px.line(df, x="period", y="market_share", color="brand", 
-                                     title="Brand Market Share Over Time",
-                                     labels={"period": "Time Period", "market_share": "Market Share (%)", "brand": "Brand"},
-                                     markers=True)
-                        fig.update_layout(yaxis_ticksuffix="%")
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with viz_tab2:
-                        # Create search volume chart
-                        fig = px.line(df, x="period", y="search_volume", color="brand", 
-                                     title="Brand Search Volume Over Time",
-                                     labels={"period": "Time Period", "search_volume": "Search Volume", "brand": "Brand"},
-                                     markers=True)
-                        st.plotly_chart(fig, use_container_width=True)
-                    
-                    with viz_tab3:
-                        # Display data table
-                        st.dataframe(df)
-                    
-                    # Export options
-                    st.markdown("### Export Options")
-                    
-                    col1, col2 = st.columns(2)
-                    
-                    with col1:
-                        # CSV download
-                        csv_link = get_csv_download_link(df)
-                        st.markdown(f'<a href="{csv_link}" download="brand_search_data.csv">Download CSV</a>', unsafe_allow_html=True)
-                    
-                    with col2:
-                        # Excel download
-                        excel_link = get_excel_download_link(df)
-                        st.markdown(f'<a href="{excel_link}" download="brand_search_data.xlsx">Download Excel</a>', unsafe_allow_html=True)
-                else:
-                    st.error("No data returned. Please check your inputs and try again.")
-    
-    with tab2:
-        st.markdown('<h2 class="section-header">About Brand Search Navigator</h2>', unsafe_allow_html=True)
-        st.markdown("""
-        This tool helps you analyze brand search volumes and market share trends over time using data from Google Ads Keyword Planner.
-        
-        ### How to use:
-        1. Add brands and their associated keywords
-        2. Configure settings (date range, granularity, language, location)
-        3. Click "Run Analysis" to fetch data from Google Ads API
-        4. View results in different visualizations
-        5. Export data as needed
-        
-        ### Data Source:
-        The tool uses the Google Ads API to fetch historical search volume data for the specified keywords.
-        
-        ### Privacy:
-        All data is processed securely and not shared with third parties.
-        """)
+                st.info("Chart export is available when viewing Share of Search or Search Volume visualizations.")
 
-if __name__ == "__main__":
-    main()
+# Footer
+st.markdown("---")
+st.markdown("""
+<div style="text-align: center; color: #888;">
+    Share of Brand Search Tool | Developed with ❤️ | © 2023
+</div>
+""", unsafe_allow_html=True)
