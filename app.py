@@ -160,7 +160,7 @@ def get_search_volumes(brands, settings, client):
                     request.language = language_id
                     
                     # Set keyword text
-                    request.keyword_texts.append(keyword)
+                    request.keywords.append(keyword)
                     
                     # Set network based on settings
                     if settings["network"] == "google":
