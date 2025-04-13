@@ -796,6 +796,6 @@ if st.session_state["show_results"] and len(tabs) > 1:
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    Share of Brand Search Tool | Developed with ❤️ | © 2023
+    Share of Brand Search Tool | Developed by Proficio during 1st AI hackathon with ❤️ | © 2025
 </div>
 """, unsafe_allow_html=True)
