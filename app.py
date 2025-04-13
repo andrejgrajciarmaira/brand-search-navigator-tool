@@ -44,6 +44,7 @@ def get_google_ads_client():
 
 # Dictionary of language codes and their criterion IDs
 LANGUAGE_MAPPING = {
+    "All Languages": "all",
     "Arabic": "1019",
     "Bengali": "1056",
     "Bulgarian": "1020",
@@ -98,6 +99,7 @@ LANGUAGE_MAPPING = {
 
 # Dictionary of countries and their geo target IDs
 COUNTRY_MAPPING = {
+    "All Countries": "all",
     "Afghanistan": "2004",
     "Albania": "2008",
     "Algeria": "2012",
@@ -406,18 +408,18 @@ def get_search_volumes(brands, settings, client):
             request.customer_id = customer_id
             request.keywords.extend(brand_keywords)
             
-            # Add geo target constants
-            request.geo_target_constants.append(googleads_service.geo_target_constant_path(location_id))
+            # Add geo target constants if not "All Countries"
+            if settings["location"] != "All Countries":
+                request.geo_target_constants.append(googleads_service.geo_target_constant_path(location_id))
             
-            # Set language
-            request.language = googleads_service.language_constant_path(language_id)
+            # Set language if not "All Languages"
+            if settings["language"] != "All Languages":
+                request.language = googleads_service.language_constant_path(language_id)
             
             # Set network based on settings
-            if settings["network"] == "google":
+            if settings["network"] == "GOOGLE_SEARCH":
                 request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
-            elif settings["network"] == "google_search_partners":
-                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_PARTNERS
-            else:  # both
+            else:  # GOOGLE_SEARCH_AND_PARTNERS
                 request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
             
             # Execute the request
@@ -512,7 +514,7 @@ if "settings" not in st.session_state:
     st.session_state["settings"] = {
         "location": "United States",
         "language": "English",
-        "network": "google",
+        "network": "GOOGLE_SEARCH",
         "dateFrom": (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),  # Last year
         "dateTo": datetime.now().strftime("%Y-%m-%d"),
         "granularity": "monthly"
@@ -640,11 +642,10 @@ with tabs[0]:
             index=languages.index(st.session_state["settings"]["language"]) if st.session_state["settings"]["language"] in languages else languages.index("English")
         )
         
-        # Network
+        # Network - Updated to match the API's available options
         networks = [
-            ("google", "Google Search"),
-            ("google_search_partners", "Google Search Partners"),
-            ("both", "Both Networks")
+            ("GOOGLE_SEARCH", "Google Search"),
+            ("GOOGLE_SEARCH_AND_PARTNERS", "Google Search + Search Partners")
         ]
         network_options = [n[1] for n in networks]
         current_network_index = next((i for i, n in enumerate(networks) if n[0] == st.session_state["settings"]["network"]), 0)
