@@ -42,50 +42,306 @@ def get_google_ads_client():
         st.error(f"Error initializing Google Ads client: {str(e)}")
         return None
 
-# Function to get location ID from location name
-def get_location_id(client, location_name):
-    """Get the location criterion ID for a given location name."""
-    location_mapping = {
-        "United States": "2840",
-        "United Kingdom": "2826",
-        "Canada": "2124",
-        "Australia": "2036",
-        "Germany": "2276",
-        "France": "2250",
-        "Spain": "2724",
-        "Italy": "2380",
-        "Japan": "2392",
-        "India": "2356",
-        "Brazil": "2076",
-        "Mexico": "2484",
-        "Netherlands": "2528"
-    }
-    
-    return location_mapping.get(location_name, "2840")  # Default to US if not found
+# Dictionary of language codes and their criterion IDs
+LANGUAGE_MAPPING = {
+    "Arabic": "1019",
+    "Bengali": "1056",
+    "Bulgarian": "1020",
+    "Catalan": "1038",
+    "Chinese (Simplified)": "1017",
+    "Chinese (Traditional)": "1018",
+    "Croatian": "1039",
+    "Czech": "1021",
+    "Danish": "1009",
+    "Dutch": "1010",
+    "English": "1000",
+    "Estonian": "1043",
+    "Filipino": "1042",
+    "Finnish": "1011",
+    "French": "1002",
+    "German": "1001",
+    "Greek": "1022",
+    "Gujarati": "1072",
+    "Hebrew": "1027",
+    "Hindi": "1023",
+    "Hungarian": "1024",
+    "Icelandic": "1026",
+    "Indonesian": "1057",
+    "Italian": "1004",
+    "Japanese": "1005",
+    "Kannada": "1073",
+    "Korean": "1012",
+    "Latvian": "1028",
+    "Lithuanian": "1029",
+    "Malay": "1102",
+    "Malayalam": "1098",
+    "Marathi": "1101",
+    "Norwegian": "1013",
+    "Persian": "1064",
+    "Polish": "1030",
+    "Portuguese": "1014",
+    "Romanian": "1032",
+    "Russian": "1031",
+    "Serbian": "1035",
+    "Slovak": "1033",
+    "Slovenian": "1034",
+    "Spanish": "1003",
+    "Swedish": "1015",
+    "Tamil": "1097",
+    "Telugu": "1099",
+    "Thai": "1044",
+    "Turkish": "1016",
+    "Ukrainian": "1036",
+    "Urdu": "1076",
+    "Vietnamese": "1066"
+}
 
-# Function to get language ID from language name
-def get_language_id(client, language_name):
-    """Get the language criterion ID for a given language name."""
-    language_mapping = {
-        "English": "1000",
-        "Spanish": "1003",
-        "French": "1002",
-        "German": "1001",
-        "Italian": "1004",
-        "Portuguese": "1014",
-        "Japanese": "1005",
-        "Chinese": "1017",  # Simplified Chinese
-        "Russian": "1031",
-        "Arabic": "1019",
-        "Hindi": "1023",
-        "Dutch": "1010"
-    }
-    
-    return language_mapping.get(language_name, "1000")  # Default to English if not found
+# Dictionary of countries and their geo target IDs
+COUNTRY_MAPPING = {
+    "Afghanistan": "2004",
+    "Albania": "2008",
+    "Algeria": "2012",
+    "American Samoa": "2016",
+    "Andorra": "2020",
+    "Angola": "2024",
+    "Anguilla": "2660",
+    "Antarctica": "2010",
+    "Antigua and Barbuda": "2028",
+    "Argentina": "2032",
+    "Armenia": "2051",
+    "Aruba": "2533",
+    "Australia": "2036",
+    "Austria": "2040",
+    "Azerbaijan": "2031",
+    "Bahamas": "2044",
+    "Bahrain": "2048",
+    "Bangladesh": "2050",
+    "Barbados": "2052",
+    "Belarus": "2112",
+    "Belgium": "2056",
+    "Belize": "2084",
+    "Benin": "2204",
+    "Bermuda": "2060",
+    "Bhutan": "2064",
+    "Bolivia": "2068",
+    "Bosnia and Herzegovina": "2070",
+    "Botswana": "2072",
+    "Bouvet Island": "2074",
+    "Brazil": "2076",
+    "British Indian Ocean Territory": "2086",
+    "Brunei": "2096",
+    "Bulgaria": "2100",
+    "Burkina Faso": "2854",
+    "Burundi": "2108",
+    "Cambodia": "2116",
+    "Cameroon": "2120",
+    "Canada": "2124",
+    "Cape Verde": "2132",
+    "Cayman Islands": "2136",
+    "Central African Republic": "2140",
+    "Chad": "2148",
+    "Chile": "2152",
+    "China": "2156",
+    "Christmas Island": "2162",
+    "Cocos (Keeling) Islands": "2166",
+    "Colombia": "2170",
+    "Comoros": "2174",
+    "Congo": "2178",
+    "Cook Islands": "2184",
+    "Costa Rica": "2188",
+    "Croatia": "2191",
+    "Cuba": "2192",
+    "Cyprus": "2196",
+    "Czech Republic": "2203",
+    "Denmark": "2208",
+    "Djibouti": "2262",
+    "Dominica": "2212",
+    "Dominican Republic": "2214",
+    "East Timor": "2626",
+    "Ecuador": "2218",
+    "Egypt": "2818",
+    "El Salvador": "2222",
+    "Equatorial Guinea": "2226",
+    "Eritrea": "2232",
+    "Estonia": "2233",
+    "Ethiopia": "2231",
+    "Falkland Islands": "2238",
+    "Faroe Islands": "2234",
+    "Fiji": "2242",
+    "Finland": "2246",
+    "France": "2250",
+    "French Guiana": "2254",
+    "French Polynesia": "2258",
+    "French Southern Territories": "2260",
+    "Gabon": "2266",
+    "Gambia": "2270",
+    "Georgia": "2268",
+    "Germany": "2276",
+    "Ghana": "2288",
+    "Gibraltar": "2292",
+    "Greece": "2300",
+    "Greenland": "2304",
+    "Grenada": "2308",
+    "Guadeloupe": "2312",
+    "Guam": "2316",
+    "Guatemala": "2320",
+    "Guinea": "2324",
+    "Guinea-Bissau": "2624",
+    "Guyana": "2328",
+    "Haiti": "2332",
+    "Heard Island and McDonald Islands": "2334",
+    "Honduras": "2340",
+    "Hong Kong": "2344",
+    "Hungary": "2348",
+    "Iceland": "2352",
+    "India": "2356",
+    "Indonesia": "2360",
+    "Iran": "2364",
+    "Iraq": "2368",
+    "Ireland": "2372",
+    "Israel": "2376",
+    "Italy": "2380",
+    "Ivory Coast": "2384",
+    "Jamaica": "2388",
+    "Japan": "2392",
+    "Jordan": "2400",
+    "Kazakhstan": "2398",
+    "Kenya": "2404",
+    "Kiribati": "2296",
+    "Kuwait": "2414",
+    "Kyrgyzstan": "2417",
+    "Laos": "2418",
+    "Latvia": "2428",
+    "Lebanon": "2422",
+    "Lesotho": "2426",
+    "Liberia": "2430",
+    "Libya": "2434",
+    "Liechtenstein": "2438",
+    "Lithuania": "2440",
+    "Luxembourg": "2442",
+    "Macau": "2446",
+    "Macedonia": "2807",
+    "Madagascar": "2450",
+    "Malawi": "2454",
+    "Malaysia": "2458",
+    "Maldives": "2462",
+    "Mali": "2466",
+    "Malta": "2470",
+    "Marshall Islands": "2584",
+    "Martinique": "2474",
+    "Mauritania": "2478",
+    "Mauritius": "2480",
+    "Mayotte": "2175",
+    "Mexico": "2484",
+    "Micronesia": "2583",
+    "Moldova": "2498",
+    "Monaco": "2492",
+    "Mongolia": "2496",
+    "Montenegro": "2499",
+    "Montserrat": "2500",
+    "Morocco": "2504",
+    "Mozambique": "2508",
+    "Myanmar": "2104",
+    "Namibia": "2516",
+    "Nauru": "2520",
+    "Nepal": "2524",
+    "Netherlands": "2528",
+    "Netherlands Antilles": "2530",
+    "New Caledonia": "2540",
+    "New Zealand": "2554",
+    "Nicaragua": "2558",
+    "Niger": "2562",
+    "Nigeria": "2566",
+    "Niue": "2570",
+    "Norfolk Island": "2574",
+    "North Korea": "2408",
+    "Northern Mariana Islands": "2580",
+    "Norway": "2578",
+    "Oman": "2512",
+    "Pakistan": "2586",
+    "Palau": "2585",
+    "Palestine": "2275",
+    "Panama": "2591",
+    "Papua New Guinea": "2598",
+    "Paraguay": "2600",
+    "Peru": "2604",
+    "Philippines": "2608",
+    "Pitcairn": "2612",
+    "Poland": "2616",
+    "Portugal": "2620",
+    "Puerto Rico": "2630",
+    "Qatar": "2634",
+    "Reunion": "2638",
+    "Romania": "2642",
+    "Russia": "2643",
+    "Rwanda": "2646",
+    "Saint Helena": "2654",
+    "Saint Kitts and Nevis": "2659",
+    "Saint Lucia": "2662",
+    "Saint Pierre and Miquelon": "2666",
+    "Saint Vincent and the Grenadines": "2670",
+    "Samoa": "2882",
+    "San Marino": "2674",
+    "Sao Tome and Principe": "2678",
+    "Saudi Arabia": "2682",
+    "Senegal": "2686",
+    "Serbia": "2688",
+    "Seychelles": "2690",
+    "Sierra Leone": "2694",
+    "Singapore": "2702",
+    "Slovakia": "2703",
+    "Slovenia": "2705",
+    "Solomon Islands": "2090",
+    "Somalia": "2706",
+    "South Africa": "2710",
+    "South Georgia and the South Sandwich Islands": "2239",
+    "South Korea": "2410",
+    "Spain": "2724",
+    "Sri Lanka": "2144",
+    "Sudan": "2736",
+    "Suriname": "2740",
+    "Svalbard and Jan Mayen": "2744",
+    "Swaziland": "2748",
+    "Sweden": "2752",
+    "Switzerland": "2756",
+    "Syria": "2760",
+    "Taiwan": "2158",
+    "Tajikistan": "2762",
+    "Tanzania": "2834",
+    "Thailand": "2764",
+    "Togo": "2768",
+    "Tokelau": "2772",
+    "Tonga": "2776",
+    "Trinidad and Tobago": "2780",
+    "Tunisia": "2788",
+    "Turkey": "2792",
+    "Turkmenistan": "2795",
+    "Turks and Caicos Islands": "2796",
+    "Tuvalu": "2798",
+    "Uganda": "2800",
+    "Ukraine": "2804",
+    "United Arab Emirates": "2784",
+    "United Kingdom": "2826",
+    "United States": "2840",
+    "United States Minor Outlying Islands": "2581",
+    "Uruguay": "2858",
+    "Uzbekistan": "2860",
+    "Vanuatu": "2548",
+    "Vatican": "2336",
+    "Venezuela": "2862",
+    "Vietnam": "2704",
+    "Virgin Islands, British": "2092",
+    "Virgin Islands, U.S.": "2850",
+    "Wallis and Futuna": "2876",
+    "Western Sahara": "2732",
+    "Yemen": "2887",
+    "Zambia": "2894",
+    "Zimbabwe": "2716"
+}
 
-# Function to get search volumes from Google Ads API
+# Function to get search volumes from Google Ads API using GenerateKeywordHistoricalMetrics
 def get_search_volumes(brands, settings, client):
-    """Retrieve search volume data from Google Ads API for specified brands and keywords."""
+    """Retrieve search volume data from Google Ads API for specified brands and keywords using historical metrics."""
     if not client:
         st.error("Google Ads client not initialized. Please check your credentials.")
         return []
@@ -102,133 +358,136 @@ def get_search_volumes(brands, settings, client):
     
     if settings["granularity"] == "monthly":
         while current_date <= end_date:
-            periods.append(current_date.strftime("%Y-%m"))
+            periods.append((current_date.year, current_date.month, current_date.strftime("%Y-%m")))
             # Add one month
             month = current_date.month + 1
             year = current_date.year
             if month > 12:
                 month = 1
                 year += 1
-            current_date = current_date.replace(year=year, month=month)
+            current_date = current_date.replace(year=year, month=month, day=1)
     elif settings["granularity"] == "quarterly":
         while current_date <= end_date:
             quarter = (current_date.month - 1) // 3 + 1
-            periods.append(f"{current_date.year}-Q{quarter}")
+            periods.append((current_date.year, quarter, f"{current_date.year}-Q{quarter}"))
             # Add one quarter (3 months)
             month = current_date.month + 3
             year = current_date.year
             if month > 12:
                 month = month - 12
                 year += 1
-            current_date = current_date.replace(year=year, month=month)
+            current_date = current_date.replace(year=year, month=month, day=1)
     else:  # yearly
         while current_date.year <= end_date.year:
-            periods.append(str(current_date.year))
-            current_date = current_date.replace(year=current_date.year + 1)
+            periods.append((current_date.year, None, str(current_date.year)))
+            current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
     
     # Get location and language IDs
-    location_id = get_location_id(client, settings["location"])
-    language_id = get_language_id(client, settings["language"])
+    location_id = COUNTRY_MAPPING.get(settings["location"], "2840")  # Default to US if not found
+    language_id = LANGUAGE_MAPPING.get(settings["language"], "1000")  # Default to English if not found
     
     # Get customer ID from secrets
     customer_id = st.secrets["GOOGLE_CUSTOMER_ID"]
     
-    # Process each time period
-    for period in periods:
-        period_results = []
-        total_volume = 0
+    # Process each brand and its keywords
+    for brand in brands:
+        if not brand["name"] or not any(k.strip() for k in brand["keywords"]):
+            continue
         
-        # Process each brand and its keywords
-        for brand in brands:
-            if not brand["name"] or not any(k.strip() for k in brand["keywords"]):
-                continue
-            
-            brand_volume = 0
-            
-            # Get search volume for each keyword
-            for keyword in [k.strip() for k in brand["keywords"] if k.strip()]:
-                try:
-                    # Create keyword plan ideas request
-                    keyword_plan_idea_service = client.get_service("KeywordPlanIdeaService")
-                    
-                    # Set up the request
-                    request = client.get_type("GenerateKeywordIdeasRequest")
-                    request.customer_id = customer_id
-                    
-                    # Add location and language criteria
-                    request.geo_target_constants.append(location_id)
-                    request.language = language_id
-                    
-                    # Set keyword text
-                    request.keywords.append(keyword)
-                    
-                    # Set network based on settings
-                    if settings["network"] == "google":
-                        request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
-                    elif settings["network"] == "google_search_partners":
-                        request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_PARTNERS
-                    else:  # both
-                        request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
-                    
-                    # Set date range for historical metrics
-                    if settings["granularity"] == "monthly":
-                        year, month = period.split("-")
-                        request.historical_metrics_options.year_month_range.start.year = int(year)
-                        request.historical_metrics_options.year_month_range.start.month = int(month)
-                        request.historical_metrics_options.year_month_range.end.year = int(year)
-                        request.historical_metrics_options.year_month_range.end.month = int(month)
-                    elif settings["granularity"] == "quarterly":
-                        year, quarter = period.split("-Q")
-                        start_month = (int(quarter) - 1) * 3 + 1
-                        end_month = start_month + 2
-                        request.historical_metrics_options.year_month_range.start.year = int(year)
-                        request.historical_metrics_options.year_month_range.start.month = start_month
-                        request.historical_metrics_options.year_month_range.end.year = int(year)
-                        request.historical_metrics_options.year_month_range.end.month = end_month
-                    else:  # yearly
-                        year = int(period)
-                        request.historical_metrics_options.year_month_range.start.year = year
-                        request.historical_metrics_options.year_month_range.start.month = 1
-                        request.historical_metrics_options.year_month_range.end.year = year
-                        request.historical_metrics_options.year_month_range.end.month = 12
-                    
-                    # Execute the request
-                    response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
-                    
-                    # Process the response
-                    for result in response.results:
-                        if result.keyword_idea_metrics and result.keyword_idea_metrics.avg_monthly_searches:
-                            keyword_volume = result.keyword_idea_metrics.avg_monthly_searches
-                            brand_volume += keyword_volume
-                
-                except GoogleAdsException as ex:
-                    st.error(f"Google Ads API error: {ex}")
-                    for error in ex.failure.errors:
-                        st.error(f"Error details: {error.message}")
-                    continue
-                
-                except Exception as e:
-                    st.error(f"Error retrieving search volume for {keyword}: {str(e)}")
-                    continue
-            
-            # Add brand data to period results
-            if brand_volume > 0:
-                period_results.append({
-                    "brand": brand["name"],
-                    "period": period,
-                    "volume": brand_volume,
-                    "share": 0,  # Will calculate after all volumes are collected
-                    "color": brand["color"]
-                })
-                total_volume += brand_volume
+        brand_keywords = [k.strip() for k in brand["keywords"] if k.strip()]
         
-        # Calculate share percentages
-        for result in period_results:
-            if total_volume > 0:
-                result["share"] = round((result["volume"] / total_volume) * 100, 1)
-            else:
-                result["share"] = 0
-            results.append(result)
+        try:
+            # Create keyword plan idea service
+            keyword_plan_idea_service = client.get_service("KeywordPlanIdeaService")
+            googleads_service = client.get_service("GoogleAdsService")
+            
+            # Create request for historical metrics
+            request = client.get_type("GenerateKeywordHistoricalMetricsRequest")
+            request.customer_id = customer_id
+            request.keywords.extend(brand_keywords)
+            
+            # Add geo target constants
+            request.geo_target_constants.append(googleads_service.geo_target_constant_path(location_id))
+            
+            # Set language
+            request.language = googleads_service.language_constant_path(language_id)
+            
+            # Set network based on settings
+            if settings["network"] == "google":
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
+            elif settings["network"] == "google_search_partners":
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_PARTNERS
+            else:  # both
+                request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
+            
+            # Execute the request
+            response = keyword_plan_idea_service.generate_keyword_historical_metrics(request=request)
+            
+            # Process the response for each period
+            for period_year, period_month_or_quarter, period_label in periods:
+                brand_volume = 0
+                
+                # Process each result
+                for result in response.results:
+                    keyword_metrics = result.keyword_metrics
+                    
+                    # For monthly granularity, find the specific month's data
+                    if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
+                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                            if (monthly_search_volume.year == period_year and 
+                                monthly_search_volume.month.value == period_month_or_quarter):
+                                brand_volume += monthly_search_volume.monthly_searches
+                                break
+                    
+                    # For quarterly granularity, sum the months in the quarter
+                    elif settings["granularity"] == "quarterly" and period_month_or_quarter is not None:
+                        quarter_start_month = (period_month_or_quarter - 1) * 3 + 1
+                        quarter_end_month = quarter_start_month + 2
+                        
+                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                            if (monthly_search_volume.year == period_year and 
+                                quarter_start_month <= monthly_search_volume.month.value <= quarter_end_month):
+                                brand_volume += monthly_search_volume.monthly_searches
+                    
+                    # For yearly granularity, sum all months in the year
+                    elif settings["granularity"] == "yearly":
+                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                            if monthly_search_volume.year == period_year:
+                                brand_volume += monthly_search_volume.monthly_searches
+                
+                # Add brand data to results if there's volume
+                if brand_volume > 0:
+                    results.append({
+                        "brand": brand["name"],
+                        "period": period_label,
+                        "volume": brand_volume,
+                        "share": 0,  # Will calculate after all volumes are collected
+                        "color": brand["color"]
+                    })
+        
+        except GoogleAdsException as ex:
+            st.error(f"Google Ads API error for brand {brand['name']}: {ex}")
+            for error in ex.failure.errors:
+                st.error(f"Error details: {error.message}")
+            continue
+        
+        except Exception as e:
+            st.error(f"Error retrieving search volume for {brand['name']}: {str(e)}")
+            continue
+    
+    # Calculate total volume and share percentages for each period
+    period_totals = {}
+    for result in results:
+        period = result["period"]
+        if period not in period_totals:
+            period_totals[period] = 0
+        period_totals[period] += result["volume"]
+    
+    # Calculate share percentages
+    for result in results:
+        period = result["period"]
+        if period_totals[period] > 0:
+            result["share"] = round((result["volume"] / period_totals[period]) * 100, 1)
     
     return results
 
@@ -366,21 +625,19 @@ with tabs[0]:
         st.subheader("Search Parameters")
         
         # Location
-        locations = ["United States", "United Kingdom", "Canada", "Australia", "Germany", 
-                     "France", "Spain", "Italy", "Japan", "India", "Brazil", "Mexico", "Netherlands"]
+        locations = list(COUNTRY_MAPPING.keys())
         st.session_state["settings"]["location"] = st.selectbox(
             "Location", 
             options=locations,
-            index=locations.index(st.session_state["settings"]["location"])
+            index=locations.index(st.session_state["settings"]["location"]) if st.session_state["settings"]["location"] in locations else locations.index("United States")
         )
         
         # Language
-        languages = ["English", "Spanish", "French", "German", "Italian", "Portuguese", 
-                   "Japanese", "Chinese", "Russian", "Arabic", "Hindi", "Dutch"]
+        languages = list(LANGUAGE_MAPPING.keys())
         st.session_state["settings"]["language"] = st.selectbox(
             "Language",
             options=languages,
-            index=languages.index(st.session_state["settings"]["language"])
+            index=languages.index(st.session_state["settings"]["language"]) if st.session_state["settings"]["language"] in languages else languages.index("English")
         )
         
         # Network
