@@ -360,7 +360,10 @@ def get_search_volumes(brands, settings, client):
     
     if settings["granularity"] == "monthly":
         while current_date <= end_date:
-            periods.append((current_date.year, current_date.month, current_date.strftime("%Y-%m")))
+            display_date = current_date + timedelta(days=32)  # posun o 1 měsíc dopředu
+            display_date = display_date.replace(day=1)
+            periods.append((current_date.year, current_date.month, display_date.strftime("%Y-%m")))
+
             # Add one month
             month = current_date.month + 1
             year = current_date.year
