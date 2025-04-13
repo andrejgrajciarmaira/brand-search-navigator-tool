@@ -1,4 +1,3 @@
-
 # Share of Brand Search Tool
 
 A web application that allows you to analyze brand search volumes from Google Ads Keyword Planner. Compare your brand's search performance against competitors and visualize market share trends over time.
@@ -42,17 +41,28 @@ npm install
 
 ### 3. Configure Environment Variables
 
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the root directory based on the provided `.env.example` file:
 
 ```
 # Google Ads API credentials
 GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-client-secret
 GOOGLE_DEVELOPER_TOKEN=your-developer-token
-GOOGLE_REFRESH_TOKEN=your-refresh-token
+GOOGLE_REFRESH_TOKEN=your-refresh-token (will be obtained during authentication)
 ```
 
-### 4. Start the development server
+### 4. Obtain a Refresh Token
+
+Install the required packages for authentication and run the authentication script:
+
+```bash
+npm install google-auth-library dotenv open
+node scripts/auth.js
+```
+
+Follow the prompts in the browser to authenticate and generate a refresh token.
+
+### 5. Start the development server
 
 ```bash
 npm run dev
@@ -93,12 +103,13 @@ To use this application with real data from Google Ads, you'll need to set up th
 
 ### Step 4: Generate a Refresh Token
 
-1. Run the authentication script:
+1. Configure your `.env` file with your client ID and secret
+2. Run the authentication script:
    ```bash
-   npm run auth
+   node scripts/auth.js
    ```
-2. Follow the prompts to authorize the application
-3. The refresh token will be saved in your `.env` file
+3. Follow the prompts to authorize the application
+4. The refresh token will be automatically saved to your `.env` file
 
 ## Data Integration
 

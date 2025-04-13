@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -136,7 +135,7 @@ const SetupGuide = () => {
                     </pre>
                   </li>
                   <li>
-                    <p>Create a <code>.env</code> file in the root of the project with the following content:</p>
+                    <p>Create a <code>.env</code> file in the project root with the following content (you can copy from <code>.env.example</code>):</p>
                     <pre className="bg-gray-100 p-2 rounded-md overflow-x-auto text-sm my-2">
 {`# Google Ads API credentials
 GOOGLE_CLIENT_ID=your-client-id
@@ -156,16 +155,22 @@ GOOGLE_REFRESH_TOKEN=your-refresh-token (will be obtained during authentication)
               <AccordionContent className="space-y-2">
                 <ol className="list-decimal pl-6 space-y-4">
                   <li>
-                    <p>Run the authentication script:</p>
+                    <p>Install required dependencies for the authentication script:</p>
                     <pre className="bg-gray-100 p-2 rounded-md overflow-x-auto text-sm my-2">
-                      npm run auth
+                      npm install google-auth-library dotenv open
                     </pre>
                   </li>
                   <li>
-                    <p>Follow the prompts to authorize the application</p>
+                    <p>Run the authentication script directly:</p>
+                    <pre className="bg-gray-100 p-2 rounded-md overflow-x-auto text-sm my-2">
+                      node scripts/auth.js
+                    </pre>
                   </li>
                   <li>
-                    <p>After successful authorization, the refresh token will be saved in your <code>.env</code> file</p>
+                    <p>Follow the prompts to authorize the application in your browser</p>
+                  </li>
+                  <li>
+                    <p>After successful authorization, the refresh token will be saved in your <code>.env</code> file automatically</p>
                   </li>
                 </ol>
               </AccordionContent>
