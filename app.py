@@ -152,15 +152,14 @@ Compare your brands against competitors to gain insights into search performance
 """)
 
 # Check for authentication
-query_params = st.experimental_get_query_params()
-if "code" in query_params:
+if "code" in st.query_params:
     with st.spinner("Authenticating with Google..."):
         try:
             auth_code = query_params["code"][0]
             token_data = exchange_code(auth_code)
             st.session_state["authenticated"] = True
             st.session_state["token_data"] = token_data
-            st.experimental_set_query_params()
+            st.query_params.clear()
             st.success("Authentication successful!")
         except Exception as e:
             st.error(f"Authentication failed: {str(e)}")
