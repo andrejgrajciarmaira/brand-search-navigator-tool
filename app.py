@@ -782,57 +782,14 @@ if st.session_state["show_results"] and len(tabs) > 1:
         # Export options
         st.subheader("Export Options")
         
-        col_exp1, col_exp2 = st.columns(2)
-        
-        with col_exp1:
-            # Export as CSV
-            csv = df.to_csv(index=False)
-            st.download_button(
-                label="📄 Download CSV",
-                data=csv,
-                file_name=f"share_of_search_data_{datetime.now().strftime('%Y%m%d')}.csv",
-                mime="text/csv"
-            )
-        
-        with col_exp2:
-            # Export as Excel
-            buffer = BytesIO()
-            with pd.ExcelWriter(buffer, engine="xlsxwriter") as writer:
-                df.to_excel(writer, sheet_name="Data", index=False)
-                workbook = writer.book
-                worksheet = writer.sheets["Data"]
-                
-                # Add a chart sheet
-                chart_sheet = workbook.add_worksheet("Chart")
-                
-                # Create a chart
-                chart = workbook.add_chart({"type": "line"})
-                
-                # Configure the chart
-                for i, brand in enumerate(df["brand"].unique()):
-                    brand_data = df[df["brand"] == brand]
-                    col_idx = df.columns.get_loc("volume") + 1
-                    row_idx = 1
-                    chart.add_series({
-                        "name": brand,
-                        "categories": ["Data", row_idx, 1, row_idx + len(brand_data) - 1, 1],
-                        "values": ["Data", row_idx, col_idx, row_idx + len(brand_data) - 1, col_idx],
-                    })
-                
-                chart.set_title({"name": "Search Volume Over Time"})
-                chart.set_x_axis({"name": "Time Period"})
-                chart.set_y_axis({"name": "Search Volume"})
-                
-                # Insert the chart into the chart sheet
-                chart_sheet.insert_chart("B2", chart, {"x_scale": 2, "y_scale": 2})
-            
-            buffer.seek(0)
-            st.download_button(
-                label="📊 Download Excel",
-                data=buffer,
-                file_name=f"share_of_search_data_{datetime.now().strftime('%Y%m%d')}.xlsx",
-                mime="application/vnd.ms-excel"
-            )
+        # Export as CSV
+        csv = df.to_csv(index=False)
+        st.download_button(
+            label="📄 Download CSV",
+            data=csv,
+            file_name=f"share_of_search_data_{datetime.now().strftime('%Y%m%d')}.csv",
+            mime="text/csv"
+        )
 
 # Footer
 st.markdown("---")
