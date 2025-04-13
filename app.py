@@ -360,7 +360,16 @@ def get_search_volumes(brands, settings, client):
     
     if settings["granularity"] == "monthly":
         while current_date <= end_date:
-            periods.append((current_date.year, current_date.month, current_date.strftime("%Y-%m")))
+            # Store the display label with the correct month name
+            display_label = current_date.strftime("%Y-%m")
+            
+            # For API matching, we need to adjust for the month offset
+            # Google Ads API reports data for the previous month
+            api_month = current_date.month
+            api_year = current_date.year
+            
+            periods.append((api_year, api_month, display_label))
+            
             # Add one month
             month = current_date.month + 1
             year = current_date.year
@@ -371,7 +380,15 @@ def get_search_volumes(brands, settings, client):
     elif settings["granularity"] == "quarterly":
         while current_date <= end_date:
             quarter = (current_date.month - 1) // 3 + 1
-            periods.append((current_date.year, quarter, f"{current_date.year}-Q{quarter}"))
+            display_label = f"{current_date.year}-Q{quarter}"
+            
+            # For quarterly data, we still need to adjust for the month offset
+            # but we're working with quarters
+            api_quarter = quarter
+            api_year = current_date.year
+            
+            periods.append((api_year, api_quarter, display_label))
+            
             # Add one quarter (3 months)
             month = current_date.month + 3
             year = current_date.year
@@ -381,7 +398,10 @@ def get_search_volumes(brands, settings, client):
             current_date = current_date.replace(year=year, month=month, day=1)
     else:  # yearly
         while current_date.year <= end_date.year:
-            periods.append((current_date.year, None, str(current_date.year)))
+            display_label = str(current_date.year)
+            api_year = current_date.year
+            
+            periods.append((api_year, None, display_label))
             current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
     
     # Get location and language IDs
@@ -434,6 +454,7 @@ def get_search_volumes(brands, settings, client):
                     keyword_metrics = result.keyword_metrics
                     
                     # For monthly granularity, find the specific month's data
+                    # The API returns data for the month that it represents, not when it was collected
                     if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
                         for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                             if (monthly_search_volume.year == period_year and 
@@ -493,6 +514,12 @@ def get_search_volumes(brands, settings, client):
     
     return results
 
+# Function to convert Plotly figure to image
+def plotly_fig_to_image(fig):
+    """Convert a Plotly figure to a PNG image."""
+    img_bytes = fig.to_image(format="png", width=1200, height=600, scale=2)
+    return img_bytes
+
 # App title and introduction
 st.title("🔍 Share of Brand Search Tool")
 st.markdown("""
@@ -525,6 +552,9 @@ if "results" not in st.session_state:
 
 if "show_results" not in st.session_state:
     st.session_state["show_results"] = False
+
+if "current_fig" not in st.session_state:
+    st.session_state["current_fig"] = None
 
 # Main application interface
 tabs = st.tabs(["Input Parameters", "Results"] if st.session_state["show_results"] else ["Input Parameters"])
@@ -742,6 +772,9 @@ if st.session_state["show_results"] and len(tabs) > 1:
             
             st.plotly_chart(fig, use_container_width=True)
             
+            # Store the current figure in session state for export
+            st.session_state["current_fig"] = fig
+            
         elif viz_type == "Search Volume":
             # Create a line chart for absolute search volumes
             fig = px.line(
@@ -764,6 +797,9 @@ if st.session_state["show_results"] and len(tabs) > 1:
             
             st.plotly_chart(fig, use_container_width=True)
             
+            # Store the current figure in session state for export
+            st.session_state["current_fig"] = fig
+            
         else:  # Data Table
             # Group by period and calculate totals
             periods = sorted(df["period"].unique())
@@ -779,23 +815,42 @@ if st.session_state["show_results"] and len(tabs) > 1:
             
             # Display the table
             st.dataframe(pivot_df, use_container_width=True)
+            
+            # Clear the current figure in session state since we're showing a table
+            st.session_state["current_fig"] = None
         
         # Export options
         st.subheader("Export Options")
         
-        # Export as CSV
-        csv = df.to_csv(index=False)
-        st.download_button(
-            label="📄 Download CSV",
-            data=csv,
-            file_name=f"share_of_search_data_{datetime.now().strftime('%Y%m%d')}.csv",
-            mime="text/csv"
-        )
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Export as CSV
+            csv = df.to_csv(index=False)
+            st.download_button(
+                label="📄 Download CSV",
+                data=csv,
+                file_name=f"share_of_search_data_{datetime.now().strftime('%Y%m%d')}.csv",
+                mime="text/csv"
+            )
+        
+        with col2:
+            # Export as PNG (only available if a figure is displayed)
+            if st.session_state["current_fig"] is not None:
+                img_bytes = plotly_fig_to_image(st.session_state["current_fig"])
+                st.download_button(
+                    label="📊 Download Chart as PNG",
+                    data=img_bytes,
+                    file_name=f"share_of_search_chart_{datetime.now().strftime('%Y%m%d')}.png",
+                    mime="image/png"
+                )
+            else:
+                st.info("Chart export is available when viewing Share of Search or Search Volume visualizations.")
 
 # Footer
 st.markdown("---")
 st.markdown("""
 <div style="text-align: center; color: #888;">
-    Share of Brand Search Tool | Developed by Proficio during 2025 1st AI Hackathon with <3
+    Share of Brand Search Tool | Developed with ❤️ | © 2023
 </div>
 """, unsafe_allow_html=True)
