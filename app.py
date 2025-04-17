@@ -437,7 +437,7 @@ def get_search_volumes(brands, settings, client):
                     if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
                         for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                             if (monthly_search_volume.year == period_year and 
-                                monthly_search_volume.month.value == period_month_or_quarter):
+                                monthly_search_volume.month.value == period_month_or_quarter - 1):
                                 brand_volume += monthly_search_volume.monthly_searches
                                 break
                     
