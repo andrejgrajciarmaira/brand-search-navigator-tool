@@ -42,61 +42,6 @@ def get_google_ads_client():
         st.error(f"Error initializing Google Ads client: {str(e)}")
         return None
 
-# Dictionary of language codes and their criterion IDs
-LANGUAGE_MAPPING = {
-    "All Languages": "all",
-    "Arabic": "1019",
-    "Bengali": "1056",
-    "Bulgarian": "1020",
-    "Catalan": "1038",
-    "Chinese (Simplified)": "1017",
-    "Chinese (Traditional)": "1018",
-    "Croatian": "1039",
-    "Czech": "1021",
-    "Danish": "1009",
-    "Dutch": "1010",
-    "English": "1000",
-    "Estonian": "1043",
-    "Filipino": "1042",
-    "Finnish": "1011",
-    "French": "1002",
-    "German": "1001",
-    "Greek": "1022",
-    "Gujarati": "1072",
-    "Hebrew": "1027",
-    "Hindi": "1023",
-    "Hungarian": "1024",
-    "Icelandic": "1026",
-    "Indonesian": "1057",
-    "Italian": "1004",
-    "Japanese": "1005",
-    "Kannada": "1073",
-    "Korean": "1012",
-    "Latvian": "1028",
-    "Lithuanian": "1029",
-    "Malay": "1102",
-    "Malayalam": "1098",
-    "Marathi": "1101",
-    "Norwegian": "1013",
-    "Persian": "1064",
-    "Polish": "1030",
-    "Portuguese": "1014",
-    "Romanian": "1032",
-    "Russian": "1031",
-    "Serbian": "1035",
-    "Slovak": "1033",
-    "Slovenian": "1034",
-    "Spanish": "1003",
-    "Swedish": "1015",
-    "Tamil": "1097",
-    "Telugu": "1099",
-    "Thai": "1044",
-    "Turkish": "1016",
-    "Ukrainian": "1036",
-    "Urdu": "1076",
-    "Vietnamese": "1066"
-}
-
 # Dictionary of countries and their geo target IDs
 COUNTRY_MAPPING = {
     "All Countries": "all",
@@ -341,9 +286,9 @@ COUNTRY_MAPPING = {
     "Zimbabwe": "2716"
 }
 
-# Function to get search volumes from Google Ads API using GenerateKeywordHistoricalMetrics
+# Function to get search volumes from Google Ads API using GenerateKeywordIdeas
 def get_search_volumes(brands, settings, client):
-    """Retrieve search volume data from Google Ads API for specified brands and keywords using historical metrics."""
+    """Retrieve search volume data from Google Ads API for specified brands and keywords using Keyword Ideas API."""
     if not client:
         st.error("Google Ads client not initialized. Please check your credentials.")
         return []
@@ -351,8 +296,8 @@ def get_search_volumes(brands, settings, client):
     results = []
     
     # Parse date range from settings
-    start_date = datetime.strptime(settings["dateFrom"], "%Y-%m-%d")
-    end_date = datetime.strptime(settings["dateTo"], "%Y-%m-%d")
+    start_date = datetime.strptime(settings["dateFrom"], "%Y-%m")
+    end_date = datetime.strptime(settings["dateTo"], "%Y-%m")
     
     # Generate time periods based on granularity
     periods = []
@@ -384,9 +329,8 @@ def get_search_volumes(brands, settings, client):
             periods.append((current_date.year, None, str(current_date.year)))
             current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
     
-    # Get location and language IDs
+    # Get location ID
     location_id = COUNTRY_MAPPING.get(settings["location"], "2840")  # Default to US if not found
-    language_id = LANGUAGE_MAPPING.get(settings["language"], "1000")  # Default to English if not found
     
     # Get customer ID from secrets
     customer_id = st.secrets["GOOGLE_CUSTOMER_ID"]
@@ -403,18 +347,16 @@ def get_search_volumes(brands, settings, client):
             keyword_plan_idea_service = client.get_service("KeywordPlanIdeaService")
             googleads_service = client.get_service("GoogleAdsService")
             
-            # Create request for historical metrics
-            request = client.get_type("GenerateKeywordHistoricalMetricsRequest")
+            # Create request for keyword ideas
+            request = client.get_type("GenerateKeywordIdeasRequest")
             request.customer_id = customer_id
-            request.keywords.extend(brand_keywords)
+            
+            # Set up keyword seed
+            request.keyword_seed.keywords.extend(brand_keywords)
             
             # Add geo target constants if not "All Countries"
             if settings["location"] != "All Countries":
                 request.geo_target_constants.append(googleads_service.geo_target_constant_path(location_id))
-            
-            # Set language if not "All Languages"
-            if settings["language"] != "All Languages":
-                request.language = googleads_service.language_constant_path(language_id)
             
             # Set network based on settings
             if settings["network"] == "GOOGLE_SEARCH":
@@ -422,40 +364,56 @@ def get_search_volumes(brands, settings, client):
             else:  # GOOGLE_SEARCH_AND_PARTNERS
                 request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
             
+            # Set historical metrics options with date range
+            historical_metrics_options = request.historical_metrics_options
+            
+            # Create YearMonthRange for the date range
+            year_month_range = historical_metrics_options.year_month_range
+            
+            # Set start date
+            year_month_range.start.year = start_date.year
+            year_month_range.start.month = client.enums.MonthOfYearEnum(start_date.month)
+            
+            # Set end date
+            year_month_range.end.year = end_date.year
+            year_month_range.end.month = client.enums.MonthOfYearEnum(end_date.month)
+            
             # Execute the request
-            response = keyword_plan_idea_service.generate_keyword_historical_metrics(request=request)
+            response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
             
             # Process the response for each period
             for period_year, period_month_or_quarter, period_label in periods:
                 brand_volume = 0
                 
                 # Process each result
-                for result in response.results:
-                    keyword_metrics = result.keyword_metrics
-                    
-                    # For monthly granularity, find the specific month's data
-                    if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
-                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                            if (monthly_search_volume.year == period_year and 
-                                monthly_search_volume.month.value - 1 == period_month_or_quarter):
-                                brand_volume += monthly_search_volume.monthly_searches
-                                break
-                    
-                    # For quarterly granularity, sum the months in the quarter
-                    elif settings["granularity"] == "quarterly" and period_month_or_quarter is not None:
-                        quarter_start_month = (period_month_or_quarter - 1) * 3 + 1
-                        quarter_end_month = quarter_start_month + 2
+                for result in response:
+                    # Only process results that match our keywords
+                    if result.text.lower() in [k.lower() for k in brand_keywords]:
+                        keyword_metrics = result.keyword_idea_metrics
                         
-                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                            if (monthly_search_volume.year == period_year and 
-                                quarter_start_month <= monthly_search_volume.month.value - 1 <= quarter_end_month):
-                                brand_volume += monthly_search_volume.monthly_searches
-                    
-                    # For yearly granularity, sum all months in the year
-                    elif settings["granularity"] == "yearly":
-                        for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                            if monthly_search_volume.year == period_year:
-                                brand_volume += monthly_search_volume.monthly_searches
+                        # For monthly granularity, find the specific month's data
+                        if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
+                            for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                                if (monthly_search_volume.year == period_year and 
+                                    monthly_search_volume.month.value == period_month_or_quarter):
+                                    brand_volume += monthly_search_volume.monthly_searches
+                                    break
+                        
+                        # For quarterly granularity, sum the months in the quarter
+                        elif settings["granularity"] == "quarterly" and period_month_or_quarter is not None:
+                            quarter_start_month = (period_month_or_quarter - 1) * 3 + 1
+                            quarter_end_month = quarter_start_month + 2
+                            
+                            for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                                if (monthly_search_volume.year == period_year and 
+                                    quarter_start_month <= monthly_search_volume.month.value <= quarter_end_month):
+                                    brand_volume += monthly_search_volume.monthly_searches
+                        
+                        # For yearly granularity, sum all months in the year
+                        elif settings["granularity"] == "yearly":
+                            for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                                if monthly_search_volume.year == period_year:
+                                    brand_volume += monthly_search_volume.monthly_searches
                 
                 # Add brand data to results if there's volume
                 if brand_volume > 0:
@@ -494,7 +452,7 @@ def get_search_volumes(brands, settings, client):
     return results
 
 # App title and introduction
-st.title("🔍 Share of Brand Search Tool")
+st.title("📊 Share of Brand Search Tool")
 st.markdown("""
 This tool helps you analyze brand search volumes from Google Ads and visualize market share trends over time.
 Compare your brands against competitors to gain insights into search performance.
@@ -510,13 +468,17 @@ if "brands" not in st.session_state:
         {"id": str(uuid.uuid4()), "name": "", "keywords": [""], "isOwnBrand": False, "color": "#ff7f0e"}
     ]
 
+# Calculate default date range: 1 year back with end month being current month - 1
+current_date = datetime.now()
+end_date = datetime(current_date.year, current_date.month, 1) - timedelta(days=1)  # Last day of previous month
+start_date = datetime(end_date.year - 1, end_date.month, 1)  # One year before end date
+
 if "settings" not in st.session_state:
     st.session_state["settings"] = {
         "location": "United States",
-        "language": "English",
         "network": "GOOGLE_SEARCH",
-        "dateFrom": (datetime.now() - timedelta(days=365)).strftime("%Y-%m-%d"),  # Last year
-        "dateTo": datetime.now().strftime("%Y-%m-%d"),
+        "dateFrom": start_date.strftime("%Y-%m"),  # Last year
+        "dateTo": end_date.strftime("%Y-%m"),  # Current month - 1
         "granularity": "monthly"
     }
 
@@ -634,14 +596,6 @@ with tabs[0]:
             index=locations.index(st.session_state["settings"]["location"]) if st.session_state["settings"]["location"] in locations else locations.index("United States")
         )
         
-        # Language
-        languages = list(LANGUAGE_MAPPING.keys())
-        st.session_state["settings"]["language"] = st.selectbox(
-            "Language",
-            options=languages,
-            index=languages.index(st.session_state["settings"]["language"]) if st.session_state["settings"]["language"] in languages else languages.index("English")
-        )
-        
         # Network - Updated to match the API's available options
         networks = [
             ("GOOGLE_SEARCH", "Google Search"),
@@ -660,21 +614,29 @@ with tabs[0]:
         col_date1, col_date2 = st.columns(2)
         
         with col_date1:
-            start_date = st.date_input(
-                "From Date",
-                value=datetime.strptime(st.session_state["settings"]["dateFrom"], "%Y-%m-%d"),
+            # Convert the date string to datetime for the date_input
+            start_date_obj = datetime.strptime(st.session_state["settings"]["dateFrom"], "%Y-%m")
+            # Use a date_input but only extract year and month
+            start_date_full = st.date_input(
+                "From Month",
+                value=start_date_obj,
                 max_value=datetime.now()
             )
-            st.session_state["settings"]["dateFrom"] = start_date.strftime("%Y-%m-%d")
+            # Store only year and month
+            st.session_state["settings"]["dateFrom"] = start_date_full.strftime("%Y-%m")
         
         with col_date2:
-            end_date = st.date_input(
-                "To Date",
-                value=datetime.strptime(st.session_state["settings"]["dateTo"], "%Y-%m-%d"),
-                min_value=start_date,
+            # Convert the date string to datetime for the date_input
+            end_date_obj = datetime.strptime(st.session_state["settings"]["dateTo"], "%Y-%m")
+            # Use a date_input but only extract year and month
+            end_date_full = st.date_input(
+                "To Month",
+                value=end_date_obj,
+                min_value=start_date_full,
                 max_value=datetime.now()
             )
-            st.session_state["settings"]["dateTo"] = end_date.strftime("%Y-%m-%d")
+            # Store only year and month
+            st.session_state["settings"]["dateTo"] = end_date_full.strftime("%Y-%m")
         
         # Data Granularity
         st.session_state["settings"]["granularity"] = st.radio(
