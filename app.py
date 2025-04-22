@@ -364,11 +364,11 @@ def get_search_volumes(brands, settings, client):
                 request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH
             else:  # GOOGLE_SEARCH_AND_PARTNERS
                 request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
-            
-            from google.ads.googleads.v16.types import YearMonth  # or the version you're using
 
             historical_metrics_options = request.historical_metrics_options
             year_month_range = historical_metrics_options.year_month_range
+
+            YearMonth = client.get_type("YearMonth")
 
             # Create YearMonth for start
             start_ym = YearMonth()
