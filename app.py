@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import altair as alt
+import calendar
 import os
 import json
 from datetime import datetime, timedelta
@@ -370,7 +371,8 @@ def get_search_volumes(brands, settings, client):
             
             # Set start date
             year_month_range.start.year = start_date.year
-            year_month_range.start.month = client.enums.MonthOfYearEnum(start_date.month)
+            month_enum_name = calendar.month_name[start_date.month].upper()  # e.g., 'JANUARY'
+            year_month_range.start.month = client.enums.MonthOfYearEnum[month_enum_name]
             
             # ✨ Fix: Make end date inclusive by adding 1 month
             end_month = end_date.month + 1
@@ -379,7 +381,8 @@ def get_search_volumes(brands, settings, client):
                 end_month = 1
                 end_year += 1
             year_month_range.end.year = end_year
-            year_month_range.end.month = client.enums.MonthOfYearEnum(end_month)
+            end_month_enum_name = calendar.month_name[end_month].upper()
+            year_month_range.end.month = client.enums.MonthOfYearEnum[end_month_enum_name]
             
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
