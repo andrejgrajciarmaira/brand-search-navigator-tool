@@ -384,9 +384,6 @@ def get_search_volumes(brands, settings, client):
             end_month_enum_name = calendar.month_name[end_month].upper()
             year_month_range.end.year = end_year
             year_month_range.end.month = client.enums.MonthOfYearEnum[end_month_enum_name]
-
-            st.write("Start:", year_month_range.start.month.value, year_month_range.start.year)
-            st.write("End:", year_month_range.end.month.value, year_month_range.end.year)
             
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
