@@ -368,32 +368,26 @@ def get_search_volumes(brands, settings, client):
             historical_metrics_options = request.historical_metrics_options
             year_month_range = historical_metrics_options.year_month_range
 
-# Set historical metrics options with date range
-historical_metrics_options = request.historical_metrics_options
-year_month_range = historical_metrics_options.year_month_range
+            historical_metrics_options = request.historical_metrics_options
+            year_month_range = historical_metrics_options.year_month_range
 
-# Start date
-start_ym = client.get_type("YearMonth")
-start_ym.year = start_date.year
-start_ym.month = client.enums.MonthOfYearEnum[start_date.month]
+            year_month_range.start.year = start_date.year
+            if start_date.month != 1:
+                month_enum_name = calendar.month_name[start_date.month].upper()
+                year_month_range.start.month = client.enums.MonthOfYearEnum[month_enum_name]
 
-# Inclusive end date (+1 month)
-end_month = end_date.month + 1
-end_year = end_date.year
-if end_month > 12:
-    end_month = 1
-    end_year += 1
+            # End date +1 logic
+            end_month = end_date.month + 1
+            end_year = end_date.year
+            if end_month > 12:
+                end_month = 1
+                end_year += 1
+            end_month_enum_name = calendar.month_name[end_month].upper()
+            year_month_range.end.year = end_year
+            year_month_range.end.month = client.enums.MonthOfYearEnum[end_month_enum_name]
 
-end_ym = client.get_type("YearMonth")
-end_ym.year = end_year
-end_ym.month = client.enums.MonthOfYearEnum[end_month]
-
-# Assign both properly
-year_month_range.start.CopyFrom(start_ym)
-year_month_range.end.CopyFrom(end_ym)
-
-            st.write("Start:", start_ym.year, start_ym.month)
-            st.write("End:", end_ym.year, end_ym.month)
+            st.write("Start:", year_month_range.start.month, year_month_range.start.year)
+            st.write("End:", year_month_range.end.month, year_month_range.end.year)
             
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
