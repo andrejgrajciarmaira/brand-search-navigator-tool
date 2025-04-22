@@ -372,9 +372,8 @@ def get_search_volumes(brands, settings, client):
             year_month_range = historical_metrics_options.year_month_range
 
             year_month_range.start.year = start_date.year
-            if start_date.month != 1:
-                month_enum_name = calendar.month_name[start_date.month].upper()
-                year_month_range.start.month = client.enums.MonthOfYearEnum[month_enum_name]
+            month_enum_name = calendar.month_name[start_date.month].upper()
+            year_month_range.start.month = client.enums.MonthOfYearEnum[month_enum_name]
 
             # End date +1 logic
             end_month = end_date.month + 1
