@@ -365,25 +365,32 @@ def get_search_volumes(brands, settings, client):
             else:  # GOOGLE_SEARCH_AND_PARTNERS
                 request.keyword_plan_network = client.enums.KeywordPlanNetworkEnum.GOOGLE_SEARCH_AND_PARTNERS
             
-            # Set historical metrics options with date range
+            from google.ads.googleads.v16.types import YearMonth  # or the version you're using
+
             historical_metrics_options = request.historical_metrics_options
             year_month_range = historical_metrics_options.year_month_range
-            
-            # Set start date
-            year_month_range.start.year = start_date.year
-            if start_date.month != 1:
-                month_enum_name = calendar.month_name[start_date.month].upper()
-                year_month_range.start.month = client.enums.MonthOfYearEnum[month_enum_name]
-            
-            # ✨ Fix: Make end date inclusive by adding 1 month
+
+            # Create YearMonth for start
+            start_ym = YearMonth()
+            start_ym.year = start_date.year
+            start_ym.month = client.enums.MonthOfYearEnum[start_date.month]  # This is valid and safe
+
+            # Create YearMonth for end (+1 month to make it inclusive)
             end_month = end_date.month + 1
             end_year = end_date.year
             if end_month > 12:
                 end_month = 1
                 end_year += 1
-            year_month_range.end.year = end_year
-            end_month_enum_name = calendar.month_name[end_month].upper()
-            year_month_range.end.month = client.enums.MonthOfYearEnum[end_month_enum_name]
+            end_ym = YearMonth()
+            end_ym.year = end_year
+            end_ym.month = client.enums.MonthOfYearEnum[end_month]
+
+            # Assign them properly
+            year_month_range.start.CopyFrom(start_ym)
+            year_month_range.end.CopyFrom(end_ym)
+
+            st.write("Start:", start_ym.year, start_ym.month)
+            st.write("End:", end_ym.year, end_ym.month)
             
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
