@@ -368,26 +368,29 @@ def get_search_volumes(brands, settings, client):
             historical_metrics_options = request.historical_metrics_options
             year_month_range = historical_metrics_options.year_month_range
 
-            YearMonth = client.get_type("YearMonth")
+# Set historical metrics options with date range
+historical_metrics_options = request.historical_metrics_options
+year_month_range = historical_metrics_options.year_month_range
 
-            # Create YearMonth for start
-            start_ym = YearMonth()
-            start_ym.year = start_date.year
-            start_ym.month = client.enums.MonthOfYearEnum[start_date.month]  # This is valid and safe
+# Start date
+start_ym = client.get_type("YearMonth")
+start_ym.year = start_date.year
+start_ym.month = client.enums.MonthOfYearEnum[start_date.month]
 
-            # Create YearMonth for end (+1 month to make it inclusive)
-            end_month = end_date.month + 1
-            end_year = end_date.year
-            if end_month > 12:
-                end_month = 1
-                end_year += 1
-            end_ym = YearMonth()
-            end_ym.year = end_year
-            end_ym.month = client.enums.MonthOfYearEnum[end_month]
+# Inclusive end date (+1 month)
+end_month = end_date.month + 1
+end_year = end_date.year
+if end_month > 12:
+    end_month = 1
+    end_year += 1
 
-            # Assign them properly
-            year_month_range.start.CopyFrom(start_ym)
-            year_month_range.end.CopyFrom(end_ym)
+end_ym = client.get_type("YearMonth")
+end_ym.year = end_year
+end_ym.month = client.enums.MonthOfYearEnum[end_month]
+
+# Assign both properly
+year_month_range.start.CopyFrom(start_ym)
+year_month_range.end.CopyFrom(end_ym)
 
             st.write("Start:", start_ym.year, start_ym.month)
             st.write("End:", end_ym.year, end_ym.month)
