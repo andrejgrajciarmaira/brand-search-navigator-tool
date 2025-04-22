@@ -396,7 +396,7 @@ def get_search_volumes(brands, settings, client):
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                                 # Fix for API month value alignment - restore the -1 adjustment
                                 if (monthly_search_volume.year == period_year and 
-                                    monthly_search_volume.month.value - 1 == period_month_or_quarter):
+                                    monthly_search_volume.month == client.enums.MonthOfYearEnum(period_month_or_quarter)):
                                     brand_volume += monthly_search_volume.monthly_searches
                                     break
                         
@@ -408,7 +408,7 @@ def get_search_volumes(brands, settings, client):
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                                 # Fix for API month value alignment - restore the -1 adjustment
                                 if (monthly_search_volume.year == period_year and 
-                                    quarter_start_month <= monthly_search_volume.month.value - 1 <= quarter_end_month):
+                                    quarter_start_month <= monthly_search_volume.month.value <= quarter_end_month):
                                     brand_volume += monthly_search_volume.monthly_searches
                         
                         # For yearly granularity, sum all months in the year
