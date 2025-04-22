@@ -397,7 +397,7 @@ def get_search_volumes(brands, settings, client):
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                                 # ✨ Fix: Align using 1-based period_month_or_quarter
                                 if (monthly_search_volume.year == period_year and 
-                                    monthly_search_volume.month.value == period_month_or_quarter):
+                                    monthly_search_volume.month.value - 1 == period_month_or_quarter):
                                     brand_volume += monthly_search_volume.monthly_searches
                                     break
                         
