@@ -366,17 +366,20 @@ def get_search_volumes(brands, settings, client):
             
             # Set historical metrics options with date range
             historical_metrics_options = request.historical_metrics_options
-            
-            # Create YearMonthRange for the date range
             year_month_range = historical_metrics_options.year_month_range
             
             # Set start date
             year_month_range.start.year = start_date.year
             year_month_range.start.month = client.enums.MonthOfYearEnum(start_date.month)
             
-            # Set end date
-            year_month_range.end.year = end_date.year
-            year_month_range.end.month = client.enums.MonthOfYearEnum(end_date.month)
+            # ✨ Fix: Make end date inclusive by adding 1 month
+            end_month = end_date.month + 1
+            end_year = end_date.year
+            if end_month > 12:
+                end_month = 1
+                end_year += 1
+            year_month_range.end.year = end_year
+            year_month_range.end.month = client.enums.MonthOfYearEnum(end_month)
             
             # Execute the request
             response = keyword_plan_idea_service.generate_keyword_ideas(request=request)
@@ -387,43 +390,37 @@ def get_search_volumes(brands, settings, client):
                 
                 # Process each result
                 for result in response:
-                    # Only process results that match our keywords
                     if result.text.lower() in [k.lower() for k in brand_keywords]:
                         keyword_metrics = result.keyword_idea_metrics
                         
-                        # For monthly granularity, find the specific month's data
                         if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                                # Fix for API month value alignment - restore the -1 adjustment
+                                # ✨ Fix: Align using 1-based period_month_or_quarter
                                 if (monthly_search_volume.year == period_year and 
                                     monthly_search_volume.month == client.enums.MonthOfYearEnum(period_month_or_quarter)):
                                     brand_volume += monthly_search_volume.monthly_searches
                                     break
                         
-                        # For quarterly granularity, sum the months in the quarter
                         elif settings["granularity"] == "quarterly" and period_month_or_quarter is not None:
                             quarter_start_month = (period_month_or_quarter - 1) * 3 + 1
                             quarter_end_month = quarter_start_month + 2
-                            
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
-                                # Fix for API month value alignment - restore the -1 adjustment
+                                # ✨ Fix: Compare directly with value (1-based)
                                 if (monthly_search_volume.year == period_year and 
                                     quarter_start_month <= monthly_search_volume.month.value <= quarter_end_month):
                                     brand_volume += monthly_search_volume.monthly_searches
                         
-                        # For yearly granularity, sum all months in the year
                         elif settings["granularity"] == "yearly":
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                                 if monthly_search_volume.year == period_year:
                                     brand_volume += monthly_search_volume.monthly_searches
                 
-                # Add brand data to results if there's volume
                 if brand_volume > 0:
                     results.append({
                         "brand": brand["name"],
                         "period": period_label,
                         "volume": brand_volume,
-                        "share": 0,  # Will calculate after all volumes are collected
+                        "share": 0,
                         "color": brand["color"]
                     })
         
@@ -445,7 +442,6 @@ def get_search_volumes(brands, settings, client):
             period_totals[period] = 0
         period_totals[period] += result["volume"]
     
-    # Calculate share percentages
     for result in results:
         period = result["period"]
         if period_totals[period] > 0:
