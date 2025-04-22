@@ -394,8 +394,9 @@ def get_search_volumes(brands, settings, client):
                         # For monthly granularity, find the specific month's data
                         if settings["granularity"] == "monthly" and period_month_or_quarter is not None:
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                                # Fix for API month value alignment
                                 if (monthly_search_volume.year == period_year and 
-                                    monthly_search_volume.month.value - 1 == period_month_or_quarter):
+                                    monthly_search_volume.month.value == period_month_or_quarter):
                                     brand_volume += monthly_search_volume.monthly_searches
                                     break
                         
@@ -405,8 +406,9 @@ def get_search_volumes(brands, settings, client):
                             quarter_end_month = quarter_start_month + 2
                             
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
+                                # Fix for API month value alignment
                                 if (monthly_search_volume.year == period_year and 
-                                    quarter_start_month <= monthly_search_volume.month.value - 1 <= quarter_end_month):
+                                    quarter_start_month <= monthly_search_volume.month.value <= quarter_end_month):
                                     brand_volume += monthly_search_volume.monthly_searches
                         
                         # For yearly granularity, sum all months in the year
@@ -610,33 +612,113 @@ with tabs[0]:
         )
         st.session_state["settings"]["network"] = networks[network_options.index(selected_network)][0]
         
-        # Date Range
+        # Date Range using month/year selectors
         col_date1, col_date2 = st.columns(2)
         
+        # Get current date for validation
+        current_month = datetime.now().month
+        current_year = datetime.now().year
+        
+        # Calculate previous month (for max date validation)
+        prev_month = current_month - 1
+        prev_year = current_year
+        if prev_month == 0:
+            prev_month = 12
+            prev_year -= 1
+        
         with col_date1:
-            # Convert the date string to datetime for the date_input
-            start_date_obj = datetime.strptime(st.session_state["settings"]["dateFrom"], "%Y-%m")
-            # Use a date_input but only extract year and month
-            start_date_full = st.date_input(
-                "From Month",
-                value=start_date_obj,
-                max_value=datetime.now()
+            st.markdown("**From Month**")
+            
+            # Parse current from date
+            from_date = datetime.strptime(st.session_state["settings"]["dateFrom"], "%Y-%m")
+            from_year = from_date.year
+            from_month = from_date.month
+            
+            # Year selector (limit to reasonable range: 10 years back from current year)
+            min_year = current_year - 10
+            years = list(range(min_year, current_year + 1))
+            selected_from_year = st.selectbox(
+                "Year",
+                options=years,
+                index=years.index(from_year) if from_year in years else years.index(current_year - 1),
+                key="from_year"
             )
-            # Store only year and month
-            st.session_state["settings"]["dateFrom"] = start_date_full.strftime("%Y-%m")
+            
+            # Month selector
+            months = [
+                (1, "January"), (2, "February"), (3, "March"), (4, "April"),
+                (5, "May"), (6, "June"), (7, "July"), (8, "August"),
+                (9, "September"), (10, "October"), (11, "November"), (12, "December")
+            ]
+            month_options = [m[1] for m in months]
+            selected_from_month = st.selectbox(
+                "Month",
+                options=month_options,
+                index=from_month - 1,  # 0-based index
+                key="from_month"
+            )
+            selected_from_month_num = months[month_options.index(selected_from_month)][0]
+            
+            # Update session state with selected date
+            st.session_state["settings"]["dateFrom"] = f"{selected_from_year}-{selected_from_month_num:02d}"
         
         with col_date2:
-            # Convert the date string to datetime for the date_input
-            end_date_obj = datetime.strptime(st.session_state["settings"]["dateTo"], "%Y-%m")
-            # Use a date_input but only extract year and month
-            end_date_full = st.date_input(
-                "To Month",
-                value=end_date_obj,
-                min_value=start_date_full,
-                max_value=datetime.now()
+            st.markdown("**To Month**")
+            
+            # Parse current to date
+            to_date = datetime.strptime(st.session_state["settings"]["dateTo"], "%Y-%m")
+            to_year = to_date.year
+            to_month = to_date.month
+            
+            # Year selector (limit to reasonable range and ensure it's not before from_year)
+            to_years = [y for y in years if y >= selected_from_year]
+            selected_to_year = st.selectbox(
+                "Year",
+                options=to_years,
+                index=to_years.index(to_year) if to_year in to_years else min(to_years.index(selected_from_year), len(to_years) - 1),
+                key="to_year"
             )
-            # Store only year and month
-            st.session_state["settings"]["dateTo"] = end_date_full.strftime("%Y-%m")
+            
+            # Month selector (with validation)
+            # If same year as from_date, only show months >= from_month
+            # If same year as current year, only show months <= prev_month
+            available_months = months.copy()
+            if selected_to_year == selected_from_year:
+                available_months = [m for m in months if m[0] >= selected_from_month_num]
+            if selected_to_year == current_year:
+                available_months = [m for m in available_months if m[0] <= prev_month]
+            
+            # If no months available (edge case), default to from_month
+            if not available_months:
+                available_months = [months[selected_from_month_num - 1]]
+            
+            available_month_options = [m[1] for m in available_months]
+            
+            # Find closest match to current to_month
+            default_month_index = 0
+            for i, m in enumerate(available_months):
+                if m[0] == to_month:
+                    default_month_index = i
+                    break
+                elif m[0] > to_month and i > 0:
+                    default_month_index = i - 1
+                    break
+                elif i == len(available_months) - 1:
+                    default_month_index = i
+            
+            selected_to_month = st.selectbox(
+                "Month",
+                options=available_month_options,
+                index=min(default_month_index, len(available_month_options) - 1),
+                key="to_month"
+            )
+            selected_to_month_num = available_months[available_month_options.index(selected_to_month)][0]
+            
+            # Update session state with selected date
+            st.session_state["settings"]["dateTo"] = f"{selected_to_year}-{selected_to_month_num:02d}"
+            
+            # Add a note about date limitations
+            st.caption("Note: Only past months are available for selection")
         
         # Data Granularity
         st.session_state["settings"]["granularity"] = st.radio(
