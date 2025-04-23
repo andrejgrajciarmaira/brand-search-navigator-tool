@@ -317,6 +317,7 @@ def get_search_volumes(brands, settings, client):
     elif settings["granularity"] == "quarterly":
         while current_date <= end_date:
             quarter = (current_date.month - 1) // 3 + 1
+            # Include incomplete quarters
             periods.append((current_date.year, quarter, f"{current_date.year}-Q{quarter}"))
             # Add one quarter (3 months)
             month = current_date.month + 3
@@ -327,6 +328,7 @@ def get_search_volumes(brands, settings, client):
             current_date = current_date.replace(year=year, month=month, day=1)
     else:  # yearly
         while current_date.year <= end_date.year:
+            # Include incomplete years
             periods.append((current_date.year, None, str(current_date.year)))
             current_date = current_date.replace(year=current_date.year + 1, month=1, day=1)
     
@@ -403,11 +405,10 @@ def get_search_volumes(brands, settings, client):
                                 if (monthly_search_volume.year == period_year and 
                                     monthly_search_volume.month.value - 1 == period_month_or_quarter):
                                     brand_volume += monthly_search_volume.monthly_searches
-                                    break
                         
                         elif settings["granularity"] == "quarterly" and period_month_or_quarter is not None:
                             quarter_start_month = (period_month_or_quarter - 1) * 3 + 1
-                            quarter_end_month = quarter_start_month + 2
+                            quarter_end_month = min(quarter_start_month + 2, end_date.month) if period_year == end_date.year else quarter_start_month + 2
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                                 # ✨ Fix: Compare directly with value (1-based)
                                 if (monthly_search_volume.year == period_year and 
@@ -417,6 +418,9 @@ def get_search_volumes(brands, settings, client):
                         elif settings["granularity"] == "yearly":
                             for monthly_search_volume in keyword_metrics.monthly_search_volumes:
                                 if monthly_search_volume.year == period_year:
+                                    # For the end year, only include months up to the selected end month
+                                    if period_year == end_date.year and monthly_search_volume.month.value - 1 > end_date.month:
+                                        continue
                                     brand_volume += monthly_search_volume.monthly_searches
                 
                 if brand_volume > 0:
