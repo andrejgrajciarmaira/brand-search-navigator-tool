@@ -481,7 +481,7 @@ start_date = datetime(end_date.year - 1, end_date.month, 1)  # One year before e
 
 if "settings" not in st.session_state:
     st.session_state["settings"] = {
-        "location": "United States",
+        "location": "Czech Republic",
         "network": "GOOGLE_SEARCH",
         "dateFrom": start_date.strftime("%Y-%m"),  # Last year
         "dateTo": end_date.strftime("%Y-%m"),  # Current month - 1
