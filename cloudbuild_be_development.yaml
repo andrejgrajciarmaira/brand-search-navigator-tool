@@ -1,0 +1,24 @@
+options:
+  logging: CLOUD_LOGGING_ONLY
+
+steps:
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', '--network=cloudbuild',
+      '-t', 'europe-west1-docker.pkg.dev/ppc-experimenty/brand-search-navigator-tool/brand-search-navigator-tool-be-development',
+      '.'
+    ]
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'push', 'europe-west1-docker.pkg.dev/ppc-experimenty/brand-search-navigator-tool/brand-search-navigator-tool-be-development'
+    ]
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args: [
+      'run', 'deploy', 'brand-search-navigator-tool-be-development',
+      '--image', 'europe-west1-docker.pkg.dev/ppc-experimenty/brand-search-navigator-tool/brand-search-navigator-tool-be-development',
+      '--region', 'europe-west1'
+    ]
+
+images:
+  - europe-west1-docker.pkg.dev/ppc-experimenty/brand-search-navigator-tool/brand-search-navigator-tool-be-development
