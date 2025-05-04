@@ -69,7 +69,6 @@ steps:
       "$_REGION",
       "--platform",
       "managed",
-      "--allow-unauthenticated",
       "--port",
       "8080",
     ]
