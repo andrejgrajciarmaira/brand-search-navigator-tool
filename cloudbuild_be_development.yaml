@@ -1,101 +1,83 @@
 options:
   logging: CLOUD_LOGGING_ONLY
 
-# cloudbuild.yaml
-# Builds & pushes backend + frontend; then deploys both to Cloud Run
-
 substitutions:
   _PROJECT_ID: "ppc-experimenty"
   _REGION: "europe-west1"
   _REPO: "brand-search-navigator-tool"
 
 steps:
-# --------------------
 # 1) Build & push backend
-# --------------------
 - name: "gcr.io/cloud-builders/docker"
   id: "backend-build"
   args:
-    [
-      "build",
-      "-t",
-      "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA",
-      "./backend",
-    ]
+    - "build"
+    - "-t"
+    - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA"
+    - "./backend"
 
 - name: "gcr.io/cloud-builders/docker"
   id: "backend-push"
   args:
-    [
-      "push",
-      "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA",
-    ]
+    - "push"
+    - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA"
 
-# --------------------
 # 2) Build & push frontend
-# --------------------
 - name: "gcr.io/cloud-builders/docker"
   id: "frontend-build"
   args:
-    [
-      "build",
-      "-t",
-      "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA",
-      "./frontend",
-    ]
+    - "build"
+    - "-t"
+    - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA"
+    - "./frontend"
 
 - name: "gcr.io/cloud-builders/docker"
   id: "frontend-push"
   args:
-    [
-      "push",
-      "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA",
-    ]
+    - "push"
+    - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA"
 
-# --------------------
-# 3) Deploy backend to Cloud Run
-# --------------------
+# 3) Deploy backend (with all secrets injected)
 - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
   id: "backend-deploy"
-  entrypoint: gcloud
+  entrypoint: "gcloud"
   args:
-    [
-      "run",
-      "deploy",
-      "brand-search-navigator-tool-be",
-      "--image",
-      "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA",
-      "--region",
-      "$_REGION",
-      "--platform",
-      "managed",
-      "--port",
-      "8080",
-    ]
+    - "run"
+    - "deploy"
+    - "brand-search-navigator-tool-be"
+    - "--image"
+    - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA"
+    - "--region"
+    - "$_REGION"
+    - "--platform"
+    - "managed"
+    - "--port"
+    - "8080"
+    # inject all your secrets into env vars
+    - "--update-secrets=GOOGLE_DEVELOPER_TOKEN=SOS_GOOGLE_DEVELOPER_TOKEN:latest"
+    - "--update-secrets=GOOGLE_CLIENT_ID=SOS_GOOGLE_CLIENT_ID:latest"
+    - "--update-secrets=GOOGLE_CLIENT_SECRET=SOS_GOOGLE_CLIENT_SECRET:latest"
+    - "--update-secrets=GOOGLE_REFRESH_TOKEN=SOS_GOOGLE_REFRESH_TOKEN:latest"
+    - "--update-secrets=GOOGLE_LOGIN_CUSTOMER_ID=SOS_GOOGLE_LOGIN_CUSTOMER_ID:latest"
+    - "--update-secrets=GOOGLE_CUSTOMER_ID=SOS_GOOGLE_CUSTOMER_ID:latest"
 
-# --------------------
-# 4) Deploy frontend to Cloud Run
-# --------------------
+# 4) Deploy frontend
 - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
   id: "frontend-deploy"
-  entrypoint: gcloud
+  entrypoint: "gcloud"
   args:
-    [
-      "run",
-      "deploy",
-      "brand-search-navigator-tool-fe",
-      "--image",
-      "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA",
-      "--region",
-      "$_REGION",
-      "--platform",
-      "managed",
-      "--allow-unauthenticated",
-    ]
+    - "run"
+    - "deploy"
+    - "brand-search-navigator-tool-fe"
+    - "--image"
+    - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA"
+    - "--region"
+    - "$_REGION"
+    - "--platform"
+    - "managed"
+    - "--allow-unauthenticated"
 
-# --------------------------------
-# Optionally, publish build artifacts
-# --------------------------------
+# Publish the two images as build artifacts
 images:
   - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA"
   - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA"
