@@ -37,7 +37,7 @@ steps:
     - "push"
     - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA"
 
-# 3) Deploy backend (with all secrets injected)
+# 3) Deploy backend – ***with*** secret injection
 - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
   id: "backend-deploy"
   entrypoint: "gcloud"
@@ -51,9 +51,10 @@ steps:
     - "$_REGION"
     - "--platform"
     - "managed"
+    - "--allow-unauthenticated"
     - "--port"
     - "8080"
-    # inject all your secrets into env vars
+    # 🚨 inject every Streamlit secret now so entrypoint.sh won’t `set -u` fail
     - "--update-secrets=GOOGLE_DEVELOPER_TOKEN=SOS_GOOGLE_DEVELOPER_TOKEN:latest"
     - "--update-secrets=GOOGLE_CLIENT_ID=SOS_GOOGLE_CLIENT_ID:latest"
     - "--update-secrets=GOOGLE_CLIENT_SECRET=SOS_GOOGLE_CLIENT_SECRET:latest"
@@ -77,7 +78,6 @@ steps:
     - "managed"
     - "--allow-unauthenticated"
 
-# Publish the two images as build artifacts
 images:
   - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-be:$SHORT_SHA"
   - "europe-west1-docker.pkg.dev/$_PROJECT_ID/$_REPO/$_REPO-fe:$SHORT_SHA"
